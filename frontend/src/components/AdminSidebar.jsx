@@ -130,7 +130,7 @@ function AdminSidebar({ isOpen }) {
         path: "/gym-owner/members",
       },
       {
-        title: "Instructors",
+        title: "Your Gym's Instructors",
         icon: FiUserPlus,
         path: "/gym-owner/instructors",
       },
@@ -138,6 +138,11 @@ function AdminSidebar({ isOpen }) {
         title: "Classes",
         icon: FiCalendar,
         path: "/gym-owner/classes",
+      },
+      {
+        title: "Apply to Instructor",
+        icon: MdOutlineSportsGymnastics,
+        path: "/gym-owner/apply-to-instructor",
       },
       {
         title: "Verify or Reject Instructors",
@@ -191,6 +196,11 @@ function AdminSidebar({ isOpen }) {
         title: "Apply to Gyms",
         icon: MdOutlineSportsGymnastics,
         path: "/instructor/apply-to-gym",
+      },
+      {
+        title: "Verify or Reject Gym",
+        icon: FiCheckCircle,
+        path: "/instructor/verify-reject-gym",
       },
       {
         title: "Messages",

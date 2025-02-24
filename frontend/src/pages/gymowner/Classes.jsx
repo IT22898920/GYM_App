@@ -21,6 +21,7 @@ import {
   FiChevronRight,
   FiChevronsLeft,
   FiChevronsRight,
+  FiPlus,
 } from "react-icons/fi";
 
 function Classes() {
@@ -31,6 +32,25 @@ function Classes() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewMode, setViewMode] = useState("table"); // 'table' or 'grid'
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    type: "",
+    price: "",
+  });
+
+  // Sample data for demonstration
+  const classTypes = [
+    "Yoga",
+    "HIIT",
+    "Strength Training",
+    "Pilates",
+    "CrossFit",
+    "Zumba",
+    "Boxing",
+    "Spinning",
+  ];
 
   const stats = [
     {
@@ -84,13 +104,9 @@ function Classes() {
       type: "Yoga",
       schedule: {
         days: ["Monday", "Wednesday", "Friday"],
-        time: "07:00 AM",
       },
-      duration: 60,
-      capacity: 15,
       enrolled: 12,
       price: 25,
-      location: "Studio A",
       status: "active",
       nextSession: "2024-03-10 07:00",
       description:
@@ -107,13 +123,9 @@ function Classes() {
       type: "HIIT",
       schedule: {
         days: ["Tuesday", "Thursday"],
-        time: "06:00 PM",
       },
-      duration: 45,
-      capacity: 20,
       enrolled: 18,
       price: 30,
-      location: "Main Floor",
       status: "active",
       nextSession: "2024-03-11 18:00",
       description: "High-intensity interval training for maximum calorie burn.",
@@ -129,13 +141,9 @@ function Classes() {
       type: "Strength Training",
       schedule: {
         days: ["Monday", "Wednesday", "Friday"],
-        time: "10:00 AM",
       },
-      duration: 50,
-      capacity: 12,
       enrolled: 8,
       price: 28,
-      location: "Weight Room",
       status: "inactive",
       nextSession: null,
       description: "Foundation strength training for beginners.",
@@ -151,6 +159,27 @@ function Classes() {
         id: index + 1,
         name: `${baseClass.name} ${Math.floor(index / classes.length) + 1}`,
       };
+    });
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Handle form submission
+    console.log("Form submitted:", formData);
+    setShowCreateModal(false);
+    setFormData({
+      name: "",
+      description: "",
+      type: "",
+      price: "",
     });
   };
 
@@ -230,6 +259,14 @@ function Classes() {
           </div>
         </div>
       </div>
+
+      <button
+        onClick={() => setShowCreateModal(true)}
+        className="inline-flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+      >
+        <FiPlus className="w-5 h-5 mr-2" />
+        Create New Class
+      </button>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -328,9 +365,6 @@ function Classes() {
                     Schedule
                   </th>
                   <th className="text-left p-4 text-gray-400 font-medium">
-                    Capacity
-                  </th>
-                  <th className="text-left p-4 text-gray-400 font-medium">
                     Price
                   </th>
                   <th className="text-left p-4 text-gray-400 font-medium">
@@ -382,9 +416,6 @@ function Classes() {
                     <td className="p-4">
                       <div className="text-gray-300">
                         {classItem.schedule.days.join(", ")}
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        {classItem.schedule.time}
                       </div>
                     </td>
                     <td className="p-4">
@@ -600,14 +631,6 @@ function Classes() {
                   {classItem.schedule.days.join(", ")}
                 </div>
                 <div className="flex items-center text-gray-400">
-                  <FiClock className="w-4 h-4 mr-2 text-violet-400" />
-                  {classItem.schedule.time} • {classItem.duration} min
-                </div>
-                <div className="flex items-center text-gray-400">
-                  <FiMapPin className="w-4 h-4 mr-2 text-violet-400" />
-                  {classItem.location}
-                </div>
-                <div className="flex items-center text-gray-400">
                   <FiDollarSign className="w-4 h-4 mr-2 text-violet-400" />$
                   {classItem.price} per class
                 </div>
@@ -692,6 +715,127 @@ function Classes() {
                   className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
                 >
                   Delete Class
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Create/Edit Class Modal */}
+      {(showCreateModal || selectedClass) && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 transition-opacity"
+              aria-hidden="true"
+            >
+              <div className="absolute inset-0 bg-gray-900 opacity-75"></div>
+            </div>
+
+            <div className="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              {/* Modal Header */}
+              <div className="bg-gray-800 px-6 py-4 border-b border-gray-700">
+                <h3 className="text-2xl font-bold text-white">
+                  {selectedClass ? "Edit Class" : "Create New Class"}
+                </h3>
+              </div>
+
+              {/* Modal Content */}
+              <div className="bg-gray-800 px-6 py-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-gray-300 mb-2">
+                      Class Name
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                      placeholder="e.g., Morning Yoga Flow"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      rows="3"
+                      className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                      placeholder="Describe your class..."
+                    ></textarea>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-gray-300 mb-2">
+                        Class Type
+                      </label>
+                      <select
+                        name="type"
+                        value={formData.type}
+                        onChange={handleChange}
+                        className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                      >
+                        <option value="">Select type</option>
+                        {classTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-gray-300 mb-2">
+                        Price ($)
+                      </label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={formData.price}
+                        onChange={handleChange}
+                        className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                        placeholder="25"
+                      />
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gray-800 px-6 py-4 border-t border-gray-700 flex justify-end space-x-4">
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setSelectedClass(null);
+                    setFormData({
+                      name: "",
+                      description: "",
+                      type: "",
+                      price: "",
+                      capacity: "",
+                    });
+                  }}
+                  className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                >
+                  {selectedClass ? "Save Changes" : "Create Class"}
                 </button>
               </div>
             </div>

@@ -36,6 +36,7 @@ import GymOwnerMembers from "./pages/gymowner/Members";
 import GymOwnerSettings from "./pages/gymowner/Settings";
 import AddInstructor from "./pages/gymowner/AddInstructor";
 import VerifyRejectInstructor from "./pages/gymowner/VerifyRejectInstructor";
+import ApplyToInstructor from "./pages/gymowner/ApplyToInstructor";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -55,6 +56,8 @@ import Privacy from "./pages/Privacy";
 import Pricing from "./pages/admin/Pricing";
 import ViewProgress from "./pages/instructor/ViewProgress";
 import ApplyToGym from "./pages/instructor/ApplyToGym";
+import Finance from "./pages/admin/Finance";
+import VerifyRejectGym from "./pages/instructor/VerifyRejectGym";
 
 
 function App() {
@@ -99,6 +102,7 @@ function AppContent() {
             path="verified-instructors"
             element={<VerifiedInstructors />}
           />
+          <Route path="finance" element={<Finance />} />
         </Route>
 
         {/* Gym Owner Routes */}
@@ -110,6 +114,8 @@ function AppContent() {
           <Route path="settings" element={<GymOwnerSettings />} />
           <Route path="profile" element={<Profile />} />
           <Route path="addInstructor" element={<AddInstructor />} />
+          <Route path="apply-to-instructor" element={<ApplyToInstructor />} />
+
           <Route
             path="verify-reject-instructor"
             element={<VerifyRejectInstructor />}
@@ -132,6 +138,7 @@ function AppContent() {
           <Route path="workout-plans" element={<WorkoutPlans />} />
           <Route path="workout-plans/create" element={<CreateWorkoutPlan />} />
           <Route path="apply-to-gym" element={<ApplyToGym />} />
+          <Route path="verify-reject-gym" element={<VerifyRejectGym />} />
         </Route>
 
         {/* Public Routes */}
