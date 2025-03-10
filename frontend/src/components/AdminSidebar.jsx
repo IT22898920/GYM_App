@@ -134,21 +134,21 @@ function AdminSidebar({ isOpen }) {
         icon: FiUserPlus,
         path: "/gym-owner/instructors",
       },
-      {
-        title: "Classes",
-        icon: FiCalendar,
-        path: "/gym-owner/classes",
-      },
+      // {
+      //   title: "Classes",
+      //   icon: FiCalendar,
+      //   path: "/gym-owner/classes",
+      // },
       {
         title: "Apply to Instructor",
         icon: MdOutlineSportsGymnastics,
         path: "/gym-owner/apply-to-instructor",
       },
-      {
-        title: "Verify or Reject Instructors",
-        icon: FiCheckCircle,
-        path: "/gym-owner/verify-reject-instructor",
-      },
+      // {
+      //   title: "Verify or Reject Instructors",
+      //   icon: FiCheckCircle,
+      //   path: "/gym-owner/verify-reject-instructor",
+      // },
       {
         title: "Finance",
         icon: FiDollarSign,
@@ -180,23 +180,30 @@ function AdminSidebar({ isOpen }) {
       {
         title: "Students",
         icon: FiUsers,
-        path: "/instructor/students",
+        submenu: true,
+        items: [
+          { title: "Gym Students", path: "/instructor/gym-students" },
+          {
+            title: "Freelance Students",
+            path: "/instructor/freelance-students",
+          },
+        ],
       },
-      {
-        title: "Schedule",
-        icon: FiClock,
-        path: "/instructor/schedule",
-      },
+      // {
+      //   title: "Schedule",
+      //   icon: FiClock,
+      //   path: "/instructor/schedule",
+      // },
       {
         title: "Workout Plans",
         icon: FiActivity,
         path: "/instructor/workout-plans",
       },
-      {
-        title: "Apply to Gyms",
-        icon: MdOutlineSportsGymnastics,
-        path: "/instructor/apply-to-gym",
-      },
+      // {
+      //   title: "Apply to Gyms",
+      //   icon: MdOutlineSportsGymnastics,
+      //   path: "/instructor/apply-to-gym",
+      // },
       {
         title: "Verify or Reject Gym",
         icon: FiCheckCircle,

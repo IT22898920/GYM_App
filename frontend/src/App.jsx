@@ -42,7 +42,7 @@ import ApplyToInstructor from "./pages/gymowner/ApplyToInstructor";
 import InstructorLayout from "./layouts/InstructorLayout";
 import InstructorDashboard from "./pages/instructor/Dashboard";
 import InstructorClasses from "./pages/instructor/Classes";
-import InstructorStudents from "./pages/instructor/Students";
+import InstructorStudents from "./pages/instructor/Student/Students";
 import InstructorSchedule from "./pages/instructor/Schedule";
 import InstructorSettings from "./pages/instructor/Settings";
 import Profile from "./pages/Profile";
@@ -58,6 +58,8 @@ import ViewProgress from "./pages/instructor/ViewProgress";
 import ApplyToGym from "./pages/instructor/ApplyToGym";
 import Finance from "./pages/admin/Finance";
 import VerifyRejectGym from "./pages/instructor/VerifyRejectGym";
+import FreelanceStudents from "./pages/instructor/Student/FreelanceStudents";
+import GymStudents from "./pages/instructor/Student/GymStudents";
 
 
 function App() {
@@ -127,6 +129,9 @@ function AppContent() {
           <Route index element={<InstructorDashboard />} />
           <Route path="classes" element={<InstructorClasses />} />
           <Route path="students" element={<InstructorStudents />} />
+          <Route path="gym-students" element={<GymStudents />} />
+          <Route path="freelance-students" element={<FreelanceStudents />} />
+
           <Route
             path="students/:studentId/progress"
             element={<ViewProgress />}
