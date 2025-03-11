@@ -37,6 +37,7 @@ import GymOwnerSettings from "./pages/gymowner/Settings";
 import AddInstructor from "./pages/gymowner/AddInstructor";
 import VerifyRejectInstructor from "./pages/gymowner/VerifyRejectInstructor";
 import ApplyToInstructor from "./pages/gymowner/ApplyToInstructor";
+import FinanceGym from "./pages/gymowner/Finance";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -60,6 +61,9 @@ import Finance from "./pages/admin/Finance";
 import VerifyRejectGym from "./pages/instructor/VerifyRejectGym";
 import FreelanceStudents from "./pages/instructor/Student/FreelanceStudents";
 import GymStudents from "./pages/instructor/Student/GymStudents";
+import AddMemberForm from "./pages/gymowner/AddMemberForm";
+
+import FinanceAdmin from "./pages/admin/Finance";
 
 
 function App() {
@@ -96,6 +100,8 @@ function AppContent() {
           <Route path="users/receptionists" element={<Receptionists />} />
           <Route path="profile" element={<Profile />} />
           <Route path="payments" element={<Pricing />} />
+          <Route path="finance" element={<FinanceAdmin />} />
+
           <Route
             path="instructor-applications"
             element={<InstructorApplications />}
@@ -117,6 +123,8 @@ function AppContent() {
           <Route path="profile" element={<Profile />} />
           <Route path="addInstructor" element={<AddInstructor />} />
           <Route path="apply-to-instructor" element={<ApplyToInstructor />} />
+          <Route path="finance" element={<FinanceGym />} />
+          <Route path="add-member" element={<AddMemberForm />} />
 
           <Route
             path="verify-reject-instructor"

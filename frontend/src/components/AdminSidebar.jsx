@@ -77,23 +77,23 @@ function AdminSidebar({ isOpen }) {
           { title: "Receptionists", path: "/admin/users/receptionists" },
         ],
       },
-      {
-        title: "Classes",
-        icon: FiCalendar,
-        submenu: true,
-        items: [
-          { title: "Schedule", path: "/admin/classes" },
-          { title: "Add Class", path: "/admin/classes/add" },
-        ],
-      },
+      // {
+      //   title: "Classes",
+      //   icon: FiCalendar,
+      //   submenu: true,
+      //   items: [
+      //     { title: "Schedule", path: "/admin/classes" },
+      //     { title: "Add Class", path: "/admin/classes/add" },
+      //   ],
+      // },
       {
         title: "Finance",
         icon: FiDollarSign,
         submenu: true,
         items: [
-          { title: "Payments", path: "/admin/payments" },
-          { title: "Invoices", path: "/admin/invoices" },
-          { title: "Subscriptions", path: "/admin/subscriptions" },
+          { title: "Payments", path: "/admin/finance" },
+          // { title: "Invoices", path: "/admin/invoices" },
+          // { title: "Subscriptions", path: "/admin/subscriptions" },
         ],
       },
       {

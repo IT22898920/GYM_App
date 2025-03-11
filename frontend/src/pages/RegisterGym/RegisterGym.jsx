@@ -16,13 +16,12 @@ import {
   FiTwitter,
   FiImage,
   FiDollarSign,
+  FiCreditCard, // Added for payment step
 } from "react-icons/fi";
-import MapComponent from "../../components/MapComponent"; // Importing the map component
+import MapComponent from "../../components/MapComponent"; // Assuming this exists
 
 function RegisterGym() {
-  // 1) We now initialize membershipPlans with 3 default plans, each set to duration: "1 month"
   const [formData, setFormData] = useState({
-    // Basic Gym Information
     gymName: "",
     gymType: "",
     address: "",
@@ -37,51 +36,22 @@ function RegisterGym() {
       instagram: "",
       twitter: "",
     },
-
-    // Facilities & Classes
     facilities: [],
     classTypes: [],
-
-    // Membership & Pricing
     membershipPlans: [
-      {
-        name: "",
-        duration: "1 month",
-        price: "",
-        description: "",
-      },
-      {
-        name: "",
-        duration: "1 month",
-        price: "",
-        description: "",
-      },
-      {
-        name: "",
-        duration: "1 month",
-        price: "",
-        description: "",
-      },
+      { name: "", duration: "1 month", price: "", description: "" },
+      { name: "", duration: "1 month", price: "", description: "" },
+      { name: "", duration: "1 month", price: "", description: "" },
     ],
     promotions: "",
-
-    // Payment Methods
     paymentMethods: [],
     paymentProcessor: "",
-
-    // Media
     logo: null,
     photos: [],
-
-    // Location
-    location: {
-      lat: 37.7749,
-      lng: -122.4194,
-    },
-
-    // Terms
+    location: { lat: 37.7749, lng: -122.4194 },
     termsAccepted: false,
     privacyAccepted: false,
+    paymentMethod: "", // Added for registration fee payment method
   });
 
   const [errors, setErrors] = useState({});
@@ -103,6 +73,7 @@ function RegisterGym() {
     "Membership & Pricing",
     "Media & Location",
     "Terms",
+    "Payment", // Added payment step
   ];
 
   const facilityOptions = [
@@ -157,8 +128,6 @@ function RegisterGym() {
   ];
 
   const paymentProcessorOptions = ["Stripe", "PayPal", "Square", "Other"];
-
-  // 2) Plan name options: Basic, Premium, Elite (exactly as requested)
   const planNameOptions = ["Basic", "Premium", "Elite"];
 
   const handleChange = (e) => {
@@ -220,24 +189,17 @@ function RegisterGym() {
       const social = name.split(".")[1];
       setFormData((prev) => ({
         ...prev,
-        socialMedia: {
-          ...prev.socialMedia,
-          [social]: value,
-        },
+        socialMedia: { ...prev.socialMedia, [social]: value },
       }));
     } else if (name.startsWith("membershipPlan.")) {
       const [_, field, index] = name.split(".");
       const updatedPlans = [...formData.membershipPlans];
-      updatedPlans[index] = {
-        ...updatedPlans[index],
-        [field]: value,
-      };
+      updatedPlans[index] = { ...updatedPlans[index], [field]: value };
       setFormData((prev) => ({ ...prev, membershipPlans: updatedPlans }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
 
-    // Clear errors on change
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -281,13 +243,11 @@ function RegisterGym() {
     if (!formData.city.trim()) newErrors.city = "City is required";
     if (!formData.state.trim()) newErrors.state = "State is required";
     if (!formData.zipCode.trim()) newErrors.zipCode = "ZIP code is required";
-
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Email is invalid";
     }
-
     if (!formData.phone.trim()) {
       newErrors.phone = "Phone number is required";
     } else if (!/^\+?[\d\s-]{10,}$/.test(formData.phone)) {
@@ -295,31 +255,24 @@ function RegisterGym() {
     }
 
     // Facilities & Classes Validation
-    if (formData.facilities.length === 0) {
+    if (formData.facilities.length === 0)
       newErrors.facilities = "Please select at least one facility";
-    }
-    if (formData.classTypes.length === 0) {
+    if (formData.classTypes.length === 0)
       newErrors.classTypes = "Please select at least one class type";
-    }
 
     // Membership & Pricing Validation
     if (formData.membershipPlans.length === 0) {
       newErrors.membershipPlans = "Please add at least one membership plan";
     } else {
       formData.membershipPlans.forEach((plan, index) => {
-        if (!plan.name.trim()) {
+        if (!plan.name.trim())
           newErrors[`membershipPlan.name.${index}`] = "Plan name is required";
-        }
-        if (!plan.price.trim()) {
+        if (!plan.price.trim())
           newErrors[`membershipPlan.price.${index}`] = "Price is required";
-        }
       });
     }
-
-    // Payment Methods Validation
-    if (formData.paymentMethods.length === 0) {
+    if (formData.paymentMethods.length === 0)
       newErrors.paymentMethods = "Please select at least one payment method";
-    }
 
     // Media Validation
     if (!formData.logo) newErrors.logo = "Gym logo is required";
@@ -332,6 +285,10 @@ function RegisterGym() {
     if (!formData.privacyAccepted)
       newErrors.privacyAccepted = "Please accept the privacy policy";
 
+    // Payment Validation
+    if (!formData.paymentMethod)
+      newErrors.paymentMethod = "Please select a payment method";
+
     return newErrors;
   };
 
@@ -341,8 +298,7 @@ function RegisterGym() {
 
     if (Object.keys(newErrors).length === 0) {
       setIsSubmitting(true);
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate API call
       setIsSubmitting(false);
       console.log("Form submitted:", formData);
     } else {
@@ -370,8 +326,6 @@ function RegisterGym() {
             <h2 className="text-2xl font-semibold text-white">
               Basic Information
             </h2>
-
-            {/* Gym Type */}
             <div className="group">
               <label className="block text-gray-300 mb-2">Gym Type</label>
               <select
@@ -391,8 +345,6 @@ function RegisterGym() {
                 <p className="text-red-500 text-sm mt-1">{errors.gymType}</p>
               )}
             </div>
-
-            {/* Gym Name */}
             <div className="group">
               <label className="block text-gray-300 mb-2">Gym Name</label>
               <div className="relative">
@@ -410,8 +362,6 @@ function RegisterGym() {
                 )}
               </div>
             </div>
-
-            {/* Contact Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="group">
                 <label className="block text-gray-300 mb-2">Email</label>
@@ -430,7 +380,6 @@ function RegisterGym() {
                   )}
                 </div>
               </div>
-
               <div className="group">
                 <label className="block text-gray-300 mb-2">Phone</label>
                 <div className="relative">
@@ -449,8 +398,6 @@ function RegisterGym() {
                 </div>
               </div>
             </div>
-
-            {/* Address Fields */}
             <div className="group">
               <label className="block text-gray-300 mb-2">Address</label>
               <div className="relative">
@@ -468,7 +415,6 @@ function RegisterGym() {
                 )}
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="group">
                 <label className="block text-gray-300 mb-2">City</label>
@@ -484,7 +430,6 @@ function RegisterGym() {
                   <p className="text-red-500 text-sm mt-1">{errors.city}</p>
                 )}
               </div>
-
               <div className="group">
                 <label className="block text-gray-300 mb-2">State</label>
                 <input
@@ -499,7 +444,6 @@ function RegisterGym() {
                   <p className="text-red-500 text-sm mt-1">{errors.state}</p>
                 )}
               </div>
-
               <div className="group">
                 <label className="block text-gray-300 mb-2">ZIP Code</label>
                 <input
@@ -515,8 +459,6 @@ function RegisterGym() {
                 )}
               </div>
             </div>
-
-            {/* Website & Social Media */}
             <div className="space-y-6">
               <div className="group">
                 <label className="block text-gray-300 mb-2">
@@ -534,7 +476,6 @@ function RegisterGym() {
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="group">
                   <label className="block text-gray-300 mb-2">
@@ -552,7 +493,6 @@ function RegisterGym() {
                     />
                   </div>
                 </div>
-
                 <div className="group">
                   <label className="block text-gray-300 mb-2">
                     Instagram (Optional)
@@ -569,7 +509,6 @@ function RegisterGym() {
                     />
                   </div>
                 </div>
-
                 <div className="group">
                   <label className="block text-gray-300 mb-2">
                     Twitter (Optional)
@@ -590,15 +529,12 @@ function RegisterGym() {
             </div>
           </div>
         );
-
       case 2:
         return (
           <div className="space-y-8">
             <h2 className="text-2xl font-semibold text-white">
               Facilities & Classes
             </h2>
-
-            {/* Facilities */}
             <div className="space-y-4">
               <label className="block text-gray-300 mb-4">
                 Available Facilities
@@ -636,8 +572,6 @@ function RegisterGym() {
                 <p className="text-red-500 text-sm">{errors.facilities}</p>
               )}
             </div>
-
-            {/* Class Types */}
             <div className="space-y-4">
               <label className="block text-gray-300 mb-4">
                 Available Classes
@@ -677,15 +611,12 @@ function RegisterGym() {
             </div>
           </div>
         );
-
       case 3:
         return (
           <div className="space-y-8">
             <h2 className="text-2xl font-semibold text-white">
               Membership & Pricing
             </h2>
-
-            {/* Membership Plans */}
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <label className="text-gray-300">Membership Plans</label>
@@ -698,7 +629,6 @@ function RegisterGym() {
                   <span>Add Plan</span>
                 </button>
               </div>
-
               {formData.membershipPlans.map((plan, index) => (
                 <div
                   key={index}
@@ -713,9 +643,7 @@ function RegisterGym() {
                       <FiTrash2 className="w-5 h-5" />
                     </button>
                   )}
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* 3) Use a dropdown for Plan Name */}
                     <div className="group">
                       <label className="block text-gray-300 mb-2">
                         Plan Name
@@ -739,8 +667,6 @@ function RegisterGym() {
                         </p>
                       )}
                     </div>
-
-                    {/* Duration is read-only set to '1 month' */}
                     <div className="group">
                       <label className="block text-gray-300 mb-2">
                         Duration
@@ -754,7 +680,6 @@ function RegisterGym() {
                       />
                     </div>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="group">
                       <label className="block text-gray-300 mb-2">Price</label>
@@ -775,7 +700,6 @@ function RegisterGym() {
                         )}
                       </div>
                     </div>
-
                     <div className="group">
                       <label className="block text-gray-300 mb-2">
                         Description
@@ -793,8 +717,6 @@ function RegisterGym() {
                 </div>
               ))}
             </div>
-
-            {/* Promotions */}
             <div className="group">
               <label className="block text-gray-300 mb-2">
                 Current Promotions (Optional)
@@ -808,8 +730,6 @@ function RegisterGym() {
                 placeholder="Describe any ongoing promotions or special offers..."
               ></textarea>
             </div>
-
-            {/* Payment Methods */}
             <div className="space-y-4">
               <label className="block text-gray-300 mb-4">
                 Payment Methods Accepted
@@ -847,8 +767,6 @@ function RegisterGym() {
                 <p className="text-red-500 text-sm">{errors.paymentMethods}</p>
               )}
             </div>
-
-            {/* Payment Processor */}
             <div className="group">
               <label className="block text-gray-300 mb-2">
                 Payment Processor
@@ -869,15 +787,12 @@ function RegisterGym() {
             </div>
           </div>
         );
-
       case 4:
         return (
           <div className="space-y-8">
             <h2 className="text-2xl font-semibold text-white">
               Media & Location
             </h2>
-
-            {/* Logo Upload */}
             <div className="group">
               <label className="block text-gray-300 mb-4">Gym Logo</label>
               <div className="flex items-center space-x-6">
@@ -915,8 +830,6 @@ function RegisterGym() {
                 </div>
               </div>
             </div>
-
-            {/* Gym Photos */}
             <div className="group">
               <label className="block text-gray-300 mb-4">Gym Photos</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -961,32 +874,25 @@ function RegisterGym() {
                 <p className="text-red-500 text-sm mt-1">{errors.photos}</p>
               )}
             </div>
-
-            {/* Map Location */}
             <div className="group">
               <label className="block text-gray-300 mb-4">
                 Pin Location on Map
               </label>
               <div className="aspect-video bg-gray-900/50 rounded-lg border border-gray-700">
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <MapComponent
-                    location={formData.location}
-                    onLocationChange={handleLocationChange}
-                  />
-                </div>
+                <MapComponent
+                  location={formData.location}
+                  onLocationChange={handleLocationChange}
+                />
               </div>
             </div>
           </div>
         );
-
       case 5:
         return (
           <div className="space-y-8">
             <h2 className="text-2xl font-semibold text-white">
               Terms & Conditions
             </h2>
-
-            {/* Terms and Privacy Policy */}
             <div className="space-y-4">
               <label className="flex items-center space-x-3 cursor-pointer">
                 <div className="relative">
@@ -1022,7 +928,6 @@ function RegisterGym() {
               {errors.termsAccepted && (
                 <p className="text-red-500 text-sm">{errors.termsAccepted}</p>
               )}
-
               <label className="flex items-center space-x-3 cursor-pointer">
                 <div className="relative">
                   <input
@@ -1060,7 +965,118 @@ function RegisterGym() {
             </div>
           </div>
         );
-
+      case 6:
+        return (
+          <div className="space-y-8">
+            <h2 className="text-2xl font-semibold text-white">Payment</h2>
+            <div className="bg-gray-900/50 p-6 rounded-xl space-y-6">
+              <div className="flex items-center space-x-4">
+                <FiCreditCard className="text-violet-400 w-8 h-8" />
+                <div>
+                  <p className="text-gray-300 text-lg font-medium">
+                    Registration Fee: $20
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    One-time payment to list your gym
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <p className="text-gray-300">Select Payment Method</p>
+                <div className="flex space-x-6">
+                  {["card", "manual", "bank"].map((method) => (
+                    <label
+                      key={method}
+                      className="flex items-center space-x-3 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value={method}
+                        checked={formData.paymentMethod === method}
+                        onChange={handleChange}
+                        className="hidden"
+                      />
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          formData.paymentMethod === method
+                            ? "border-violet-500"
+                            : "border-gray-600"
+                        }`}
+                      >
+                        {formData.paymentMethod === method && (
+                          <div className="w-3 h-3 rounded-full bg-violet-500"></div>
+                        )}
+                      </div>
+                      <span className="text-gray-300 capitalize">{method}</span>
+                    </label>
+                  ))}
+                </div>
+                {errors.paymentMethod && (
+                  <p className="text-red-500 text-sm">{errors.paymentMethod}</p>
+                )}
+              </div>
+              {formData.paymentMethod === "card" && (
+                <div className="space-y-4">
+                  <label className="block text-gray-300 mb-2">
+                    Enter your payment details
+                  </label>
+                  <div className="relative">
+                    <FiCreditCard className="absolute left-4 top-3.5 text-gray-500" />
+                    <input
+                      type="text"
+                      placeholder="Card Number"
+                      className="w-full bg-gray-800 text-white rounded-lg pl-12 pr-4 py-3 border border-gray-700"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="MM / YY"
+                      className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-700"
+                    />
+                    <input
+                      type="text"
+                      placeholder="CVC"
+                      className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-700"
+                    />
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    Your payment is securely processed. We do not store your
+                    card details.
+                  </p>
+                </div>
+              )}
+              {formData.paymentMethod === "manual" && (
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <p className="text-gray-300">
+                    Please contact us at payments@gymplatform.com to arrange
+                    manual payment.
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Your registration will be pending until payment is
+                    confirmed.
+                  </p>
+                </div>
+              )}
+              {formData.paymentMethod === "bank" && (
+                <div className="p-4 bg-gray-800 rounded-lg space-y-2">
+                  <p className="text-gray-300">
+                    Please transfer $20 to the following account:
+                  </p>
+                  <p className="text-gray-400">Bank Name: Demo Bank</p>
+                  <p className="text-gray-400">Account Number: 123456789</p>
+                  <p className="text-gray-400">Routing Number: 987654321</p>
+                  <p className="text-gray-400">Reference: Your Gym Name</p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Your registration will be pending until payment is
+                    confirmed.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -1068,7 +1084,6 @@ function RegisterGym() {
 
   return (
     <div className="min-h-screen bg-gray-900 py-20 relative overflow-hidden">
-      {/* Background Effects */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-900/20 via-gray-900/50 to-indigo-900/20"></div>
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
@@ -1088,13 +1103,11 @@ function RegisterGym() {
           ))}
         </div>
       </div>
-
       <div
         className={`container mx-auto px-4 relative transition-all duration-1000 ${
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
         }`}
       >
-        {/* Back Button */}
         <Link
           to="/"
           className="inline-flex items-center text-gray-400 hover:text-white mb-8 group transition-colors"
@@ -1102,8 +1115,6 @@ function RegisterGym() {
           <FiArrowLeft className="mr-2 group-hover:-translate-x-1 transition-transform" />
           Back to Home
         </Link>
-
-        {/* Header */}
         <div className="max-w-4xl mx-auto text-center mb-16">
           <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
             Register Your Gym
@@ -1113,8 +1124,6 @@ function RegisterGym() {
             Complete the form below to get started.
           </p>
         </div>
-
-        {/* Progress Steps */}
         <div className="max-w-4xl mx-auto mb-12">
           <div className="flex items-center justify-between relative">
             <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-gray-700 -translate-y-1/2"></div>
@@ -1149,17 +1158,12 @@ function RegisterGym() {
             ))}
           </div>
         </div>
-
-        {/* Form */}
         <div className="max-w-4xl mx-auto">
           <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl p-8 shadow-2xl relative overflow-hidden border border-gray-700/50">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-indigo-500/10 animate-pulse-slow"></div>
-
             <div className="relative">
               <form onSubmit={handleSubmit} className="space-y-8">
                 {renderStepContent(currentStep)}
-
-                {/* Navigation Buttons */}
                 <div className="flex justify-between pt-8">
                   {currentStep > 1 && (
                     <button

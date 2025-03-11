@@ -24,6 +24,172 @@ import {
 import { Link } from "react-router-dom";
 import MapComponent from "../components/MapComponent";
 
+// New GymDetails Component to handle the expanded section with image slider
+function GymDetails({ gym }) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Function to go to the next image
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % gym.images.length);
+  };
+
+  // Function to go to the previous image
+  const prevImage = () => {
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + gym.images.length) % gym.images.length
+    );
+  };
+
+  return (
+    <div className="border-t border-gray-700/50 p-6">
+      {/* Existing Details: Description and Contact */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div>
+          <h4 className="text-lg font-semibold text-white mb-4">
+            About {gym.name}
+          </h4>
+          <p className="text-gray-400 mb-6">{gym.description}</p>
+          <div className="space-y-3">
+            <div className="flex items-center text-gray-400">
+              <FiPhone className="w-4 h-4 mr-3 text-violet-400" />
+              <span>{gym.phone}</span>
+            </div>
+            <div className="flex items-center text-gray-400">
+              <FiMail className="w-4 h-4 mr-3 text-violet-400" />
+              <span>{gym.email}</span>
+            </div>
+            <div className="flex items-center text-gray-400">
+              <FiGlobe className="w-4 h-4 mr-3 text-violet-400" />
+              <a
+                href={gym.website}
+                className="hover:text-violet-400 transition-colors"
+              >
+                {gym.website.replace("https://", "")}
+              </a>
+            </div>
+            {gym.social.instagram && (
+              <div className="flex items-center text-gray-400">
+                <FiInstagram className="w-4 h-4 mr-3 text-violet-400" />
+                <a
+                  href={`https://instagram.com/${gym.social.instagram}`}
+                  className="hover:text-violet-400 transition-colors"
+                >
+                  @{gym.social.instagram}
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Existing Details: Instructors */}
+        <div>
+          <h4 className="text-lg font-semibold text-white mb-4">
+            Featured Instructors
+          </h4>
+          <div className="space-y-4">
+            {gym.instructors.map((instructor, index) => (
+              <div
+                key={index}
+                className="flex items-start space-x-4 p-4 bg-gray-900/50 rounded-lg"
+              >
+                <img
+                  src={instructor.image}
+                  alt={instructor.name}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h5 className="text-white font-medium">
+                        {instructor.name}
+                      </h5>
+                      <p className="text-violet-400 text-sm">
+                        {instructor.specialization}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center text-yellow-400">
+                        <FiStar className="w-4 h-4 mr-1" />
+                        <span className="text-white">{instructor.rating}</span>
+                      </div>
+                      <p className="text-gray-400 text-sm">
+                        {instructor.reviews} reviews
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="flex items-center text-gray-400 text-sm">
+                      <FiCalendar className="w-4 h-4 mr-1" />
+                      {instructor.availability.join(", ")}
+                    </div>
+                    <span className="text-white font-medium">
+                      ${instructor.price}/hr
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Existing Details: Classes */}
+      <div className="mt-8">
+        <h4 className="text-lg font-semibold text-white mb-4">
+          Featured Classes
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {gym.classes.map((cls, index) => (
+            <div key={index} className="p-4 bg-gray-900/50 rounded-lg">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h5 className="text-white font-medium">{cls.name}</h5>
+                  <p className="text-gray-400 text-sm">{cls.instructor}</p>
+                </div>
+                <span className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm">
+                  ${cls.price}
+                </span>
+              </div>
+              <div className="flex items-center text-gray-400 text-sm">
+                <FiClock className="w-4 h-4 mr-2" />
+                {cls.time} • {cls.duration}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* New Image Slider */}
+      <div className="mt-8">
+        <h4 className="text-lg font-semibold text-white mb-4">Gallery</h4>
+        <div className="relative">
+          <img
+            src={gym.images[currentImageIndex]}
+            alt={`Gym image ${currentImageIndex + 1}`}
+            className="w-full h-64 object-cover rounded-lg"
+          />
+          {gym.images.length > 1 && (
+            <>
+              <button
+                onClick={prevImage}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-2 rounded-full text-white hover:bg-black/70 transition-colors"
+              >
+                <FiArrowLeft />
+              </button>
+              <button
+                onClick={nextImage}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-2 rounded-full text-white hover:bg-black/70 transition-colors"
+              >
+                <FiArrowRight />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FindGym() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilters, setSelectedFilters] = useState({
@@ -39,6 +205,7 @@ function FindGym() {
   });
   const [selectedGym, setSelectedGym] = useState(null);
 
+  // Filter options (unchanged)
   const amenityOptions = [
     "Cardio Equipment",
     "Weight Training",
@@ -91,15 +258,18 @@ function FindGym() {
     { value: "10", label: "Within 10 miles" },
   ];
 
-  // Sample gym data
+  // Updated gym data with multiple images
   const gyms = [
     {
       id: 1,
       name: "FitZone Elite",
       description:
         "Premium fitness facility with state-of-the-art equipment and expert trainers.",
-      image:
+      images: [
         "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&q=80",
+      ],
       rating: 4.8,
       reviews: 245,
       address: "123 Fitness Street, San Francisco, CA",
@@ -116,9 +286,7 @@ function FindGym() {
       phone: "(555) 123-4567",
       email: "info@fitzone.com",
       website: "https://fitzone.com",
-      social: {
-        instagram: "fitzone",
-      },
+      social: { instagram: "fitzone" },
       lat: 37.7849,
       lng: -122.4194,
       instructors: [
@@ -163,8 +331,11 @@ function FindGym() {
       name: "PowerFlex Gym",
       description:
         "Specialized strength and conditioning facility focused on performance.",
-      image:
+      images: [
         "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&q=80",
+      ],
       rating: 4.6,
       reviews: 189,
       address: "456 Strength Ave, San Francisco, CA",
@@ -176,9 +347,7 @@ function FindGym() {
       phone: "(555) 234-5678",
       email: "info@powerflex.com",
       website: "https://powerflex.com",
-      social: {
-        instagram: "powerflex",
-      },
+      social: { instagram: "powerflex" },
       lat: 37.7649,
       lng: -122.4294,
       instructors: [
@@ -207,8 +376,11 @@ function FindGym() {
       name: "Wellness Hub",
       description:
         "Holistic wellness center combining fitness, relaxation, and mindfulness.",
-      image:
+      images: [
         "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80",
+      ],
       rating: 4.9,
       reviews: 312,
       address: "789 Health Blvd, San Francisco, CA",
@@ -220,9 +392,7 @@ function FindGym() {
       phone: "(555) 345-6789",
       email: "info@wellnesshub.com",
       website: "https://wellnesshub.com",
-      social: {
-        instagram: "wellnesshub",
-      },
+      social: { instagram: "wellnesshub" },
       lat: 37.7949,
       lng: -122.4094,
       instructors: [
@@ -291,7 +461,7 @@ function FindGym() {
 
   return (
     <div className="min-h-screen bg-gray-900 pt-24 pb-12 relative overflow-hidden">
-      {/* Background Effects */}
+      {/* Background Effects (unchanged) */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-900/20 via-gray-900/50 to-indigo-900/20"></div>
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
@@ -313,7 +483,7 @@ function FindGym() {
       </div>
 
       <div className="container mx-auto px-4 relative">
-        {/* Back Button */}
+        {/* Back Button (unchanged) */}
         <Link
           to="/"
           className="inline-flex items-center text-gray-400 hover:text-white mb-8 group transition-colors"
@@ -322,7 +492,7 @@ function FindGym() {
           Back to Home
         </Link>
 
-        {/* Header */}
+        {/* Header (unchanged) */}
         <div className="max-w-4xl mx-auto text-center mb-12">
           <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
             Find Your Perfect Gym
@@ -334,7 +504,7 @@ function FindGym() {
           </p>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar (unchanged) */}
         <div className="max-w-3xl mx-auto mb-12">
           <div className="flex items-center gap-4 bg-gray-800/40 backdrop-blur-xl p-2 rounded-full border border-gray-700/50">
             <div className="flex-1 relative">
@@ -354,14 +524,12 @@ function FindGym() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Filters */}
+          {/* Filters (unchanged) */}
           <div className="space-y-6">
             <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
                 <FiFilter className="mr-2" /> Filters
               </h2>
-
-              {/* Price Range */}
               <div className="mb-6">
                 <h3 className="text-gray-300 font-medium mb-3">Price Range</h3>
                 <select
@@ -378,8 +546,6 @@ function FindGym() {
                   ))}
                 </select>
               </div>
-
-              {/* Rating */}
               <div className="mb-6">
                 <h3 className="text-gray-300 font-medium mb-3">Rating</h3>
                 <select
@@ -394,8 +560,6 @@ function FindGym() {
                   ))}
                 </select>
               </div>
-
-              {/* Distance */}
               <div className="mb-6">
                 <h3 className="text-gray-300 font-medium mb-3">Distance</h3>
                 <select
@@ -412,8 +576,6 @@ function FindGym() {
                   ))}
                 </select>
               </div>
-
-              {/* Amenities */}
               <div className="mb-6">
                 <h3 className="text-gray-300 font-medium mb-3">Amenities</h3>
                 <div className="grid grid-cols-2 gap-2">
@@ -446,8 +608,6 @@ function FindGym() {
                   ))}
                 </div>
               </div>
-
-              {/* Class Types */}
               <div>
                 <h3 className="text-gray-300 font-medium mb-3">Class Types</h3>
                 <div className="grid grid-cols-2 gap-2">
@@ -479,8 +639,6 @@ function FindGym() {
                 </div>
               </div>
             </div>
-
-            {/* Map */}
             <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-700/50">
               <div className="h-[400px]">
                 <MapComponent
@@ -499,16 +657,16 @@ function FindGym() {
                 className="bg-gray-800/40 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-700/50 hover:shadow-[0_0_30px_rgba(124,58,237,0.2)] transition-all duration-300"
               >
                 <div className="flex flex-col md:flex-row">
-                  {/* Gym Image */}
+                  {/* Gym Image (updated to use first image from array) */}
                   <div className="md:w-64 h-48 md:h-auto relative overflow-hidden">
                     <img
-                      src={gym.image}
+                      src={gym.images[0]}
                       alt={gym.name}
                       className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-500"
                     />
                   </div>
 
-                  {/* Gym Details */}
+                  {/* Gym Details (unchanged) */}
                   <div className="flex-1 p-6">
                     <div className="flex items-start justify-between mb-4">
                       <div>
@@ -536,7 +694,6 @@ function FindGym() {
                         </div>
                       </div>
                     </div>
-
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div className="flex items-center text-gray-400">
                         <FiClock className="w-4 h-4 mr-2 text-violet-400" />
@@ -559,7 +716,6 @@ function FindGym() {
                         </span>
                       </div>
                     </div>
-
                     <div className="flex flex-wrap gap-2">
                       {gym.amenities.slice(0, 4).map((amenity, index) => (
                         <span
@@ -575,7 +731,6 @@ function FindGym() {
                         </button>
                       )}
                     </div>
-
                     <div className="mt-6 flex flex-wrap gap-4">
                       <button
                         onClick={() =>
@@ -601,140 +756,12 @@ function FindGym() {
                   </div>
                 </div>
 
-                {/* Expanded Details */}
-                {selectedGym === gym.id && (
-                  <div className="border-t border-gray-700/50 p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Description and Contact */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-white mb-4">
-                          About {gym.name}
-                        </h4>
-                        <p className="text-gray-400 mb-6">{gym.description}</p>
-
-                        <div className="space-y-3">
-                          <div className="flex items-center text-gray-400">
-                            <FiPhone className="w-4 h-4 mr-3 text-violet-400" />
-                            <span>{gym.phone}</span>
-                          </div>
-                          <div className="flex items-center text-gray-400">
-                            <FiMail className="w-4 h-4 mr-3 text-violet-400" />
-                            <span>{gym.email}</span>
-                          </div>
-                          <div className="flex items-center text-gray-400">
-                            <FiGlobe className="w-4 h-4 mr-3 text-violet-400" />
-                            <a
-                              href={gym.website}
-                              className="hover:text-violet-400 transition-colors"
-                            >
-                              {gym.website.replace("https://", "")}
-                            </a>
-                          </div>
-                          {gym.social.instagram && (
-                            <div className="flex items-center text-gray-400">
-                              <FiInstagram className="w-4 h-4 mr-3 text-violet-400" />
-                              <a
-                                href={`https://instagram.com/${gym.social.instagram}`}
-                                className="hover:text-violet-400 transition-colors"
-                              >
-                                @{gym.social.instagram}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Instructors */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-white mb-4">
-                          Featured Instructors
-                        </h4>
-                        <div className="space-y-4">
-                          {gym.instructors.map((instructor, index) => (
-                            <div
-                              key={index}
-                              className="flex items-start space-x-4 p-4 bg-gray-900/50 rounded-lg"
-                            >
-                              <img
-                                src={instructor.image}
-                                alt={instructor.name}
-                                className="w-12 h-12 rounded-full object-cover"
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <h5 className="text-white font-medium">
-                                      {instructor.name}
-                                    </h5>
-                                    <p className="text-violet-400 text-sm">
-                                      {instructor.specialization}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="flex items-center text-yellow-400">
-                                      <FiStar className="w-4 h-4 mr-1" />
-                                      <span className="text-white">
-                                        {instructor.rating}
-                                      </span>
-                                    </div>
-                                    <p className="text-gray-400 text-sm">
-                                      {instructor.reviews} reviews
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="mt-2 flex items-center justify-between">
-                                  <div className="flex items-center text-gray-400 text-sm">
-                                    <FiCalendar className="w-4 h-4 mr-1" />
-                                    {instructor.availability.join(", ")}
-                                  </div>
-                                  <span className="text-white font-medium">
-                                    ${instructor.price}/hr
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Classes */}
-                    <div className="mt-8">
-                      <h4 className="text-lg font-semibold text-white mb-4">
-                        Featured Classes
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {gym.classes.map((cls, index) => (
-                          <div
-                            key={index}
-                            className="p-4 bg-gray-900/50 rounded-lg"
-                          >
-                            <div className="flex justify-between items-start mb-3">
-                              <div>
-                                <h5 className="text-white font-medium">
-                                  {cls.name}
-                                </h5>
-                                <p className="text-gray-400 text-sm">
-                                  {cls.instructor}
-                                </p>
-                              </div>
-                              <span className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm">
-                                ${cls.price}
-                              </span>
-                            </div>
-                            <div className="flex items-center text-gray-400 text-sm">
-                              <FiClock className="w-4 h-4 mr-2" />
-                              {cls.time} • {cls.duration}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Render GymDetails component when expanded */}
+                {selectedGym === gym.id && <GymDetails gym={gym} />}
               </div>
             ))}
 
+            {/* No Results Message (unchanged) */}
             {filteredGyms.length === 0 && (
               <div className="text-center py-12 bg-gray-800/40 backdrop-blur-xl rounded-xl border border-gray-700/50">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-violet-500/10 mb-4">

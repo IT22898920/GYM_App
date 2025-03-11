@@ -5,11 +5,12 @@ import {
   FiPlus,
   FiTrash2,
   FiCalendar,
-  FiClock,
   FiActivity,
   FiUser,
   FiSave,
   FiX,
+  FiCoffee,
+  FiPackage,
 } from "react-icons/fi";
 
 function CreateWorkoutPlan() {
@@ -20,9 +21,10 @@ function CreateWorkoutPlan() {
     endDate: "",
     type: "",
     description: "",
+    // The schedule array, each element supports multiple days via "days: []"
     schedule: [
       {
-        day: "Monday",
+        days: [], // Store multiple selected days, e.g. ["Monday", "Wednesday"]
         exercises: [
           {
             name: "",
@@ -30,6 +32,26 @@ function CreateWorkoutPlan() {
             reps: "",
             weight: "",
             duration: "",
+            notes: "",
+          },
+        ],
+        meals: [
+          {
+            type: "Breakfast",
+            time: "08:00",
+            items: [],
+            calories: "",
+            protein: "",
+            carbs: "",
+            fats: "",
+            notes: "",
+          },
+        ],
+        supplements: [
+          {
+            name: "",
+            dosage: "",
+            timing: "",
             notes: "",
           },
         ],
@@ -63,6 +85,27 @@ function CreateWorkoutPlan() {
     "Sunday",
   ];
 
+  const mealTypes = [
+    "Breakfast",
+    "Morning Snack",
+    "Lunch",
+    "Afternoon Snack",
+    "Dinner",
+    "Pre-Workout",
+    "Post-Workout",
+  ];
+
+  const commonSupplements = [
+    "Whey Protein",
+    "Creatine Monohydrate",
+    "BCAAs",
+    "Pre-Workout",
+    "Multivitamin",
+    "Fish Oil",
+    "Vitamin D",
+  ];
+
+  // ----- Basic input change handler -----
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -71,13 +114,15 @@ function CreateWorkoutPlan() {
     }));
   };
 
+  // ----- Schedule Day handlers -----
+  // Add a new schedule block (with empty days, exercises, meals, supplements)
   const addDay = () => {
     setFormData((prev) => ({
       ...prev,
       schedule: [
         ...prev.schedule,
         {
-          day: weekDays[prev.schedule.length % 7],
+          days: [],
           exercises: [
             {
               name: "",
@@ -88,27 +133,66 @@ function CreateWorkoutPlan() {
               notes: "",
             },
           ],
+          meals: [
+            {
+              type: "Breakfast",
+              time: "08:00",
+              items: [],
+              calories: "",
+              protein: "",
+              carbs: "",
+              fats: "",
+              notes: "",
+            },
+          ],
+          supplements: [
+            {
+              name: "",
+              dosage: "",
+              timing: "",
+              notes: "",
+            },
+          ],
         },
       ],
     }));
   };
 
-  const removeDay = (dayIndex) => {
+  // Remove an entire schedule block
+  const removeDayBlock = (blockIndex) => {
     setFormData((prev) => ({
       ...prev,
-      schedule: prev.schedule.filter((_, index) => index !== dayIndex),
+      schedule: prev.schedule.filter((_, idx) => idx !== blockIndex),
     }));
   };
 
-  const addExercise = (dayIndex) => {
+  // Toggle a specific weekday checkbox for a schedule block
+  const handleDaysCheckbox = (blockIndex, dayName) => {
     setFormData((prev) => ({
       ...prev,
-      schedule: prev.schedule.map((day, index) => {
-        if (index === dayIndex) {
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
+          const isSelected = block.days.includes(dayName);
+          const updatedDays = isSelected
+            ? block.days.filter((d) => d !== dayName)
+            : [...block.days, dayName];
+          return { ...block, days: updatedDays };
+        }
+        return block;
+      }),
+    }));
+  };
+
+  // ----- Exercise handlers -----
+  const addExercise = (blockIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
           return {
-            ...day,
+            ...block,
             exercises: [
-              ...day.exercises,
+              ...block.exercises,
               {
                 name: "",
                 sets: "",
@@ -120,53 +204,175 @@ function CreateWorkoutPlan() {
             ],
           };
         }
-        return day;
+        return block;
       }),
     }));
   };
 
-  const removeExercise = (dayIndex, exerciseIndex) => {
+  const removeExercise = (blockIndex, exerciseIndex) => {
     setFormData((prev) => ({
       ...prev,
-      schedule: prev.schedule.map((day, index) => {
-        if (index === dayIndex) {
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
           return {
-            ...day,
-            exercises: day.exercises.filter((_, idx) => idx !== exerciseIndex),
+            ...block,
+            exercises: block.exercises.filter((_, i) => i !== exerciseIndex),
           };
         }
-        return day;
+        return block;
       }),
     }));
   };
 
-  const handleExerciseChange = (dayIndex, exerciseIndex, field, value) => {
+  const handleExerciseChange = (blockIndex, exerciseIndex, field, value) => {
     setFormData((prev) => ({
       ...prev,
-      schedule: prev.schedule.map((day, index) => {
-        if (index === dayIndex) {
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
           return {
-            ...day,
-            exercises: day.exercises.map((exercise, idx) => {
-              if (idx === exerciseIndex) {
-                return {
-                  ...exercise,
-                  [field]: value,
-                };
+            ...block,
+            exercises: block.exercises.map((exercise, i) => {
+              if (i === exerciseIndex) {
+                return { ...exercise, [field]: value };
               }
               return exercise;
             }),
           };
         }
-        return day;
+        return block;
       }),
     }));
   };
 
+  // ----- Meal handlers -----
+  const addMeal = (blockIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
+          return {
+            ...block,
+            meals: [
+              ...block.meals,
+              {
+                type: "Breakfast",
+                time: "08:00",
+                items: [],
+                calories: "",
+                protein: "",
+                carbs: "",
+                fats: "",
+                notes: "",
+              },
+            ],
+          };
+        }
+        return block;
+      }),
+    }));
+  };
+
+  const removeMeal = (blockIndex, mealIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
+          return {
+            ...block,
+            meals: block.meals.filter((_, i) => i !== mealIndex),
+          };
+        }
+        return block;
+      }),
+    }));
+  };
+
+  const handleMealChange = (blockIndex, mealIndex, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
+          return {
+            ...block,
+            meals: block.meals.map((meal, i) => {
+              if (i === mealIndex) {
+                return { ...meal, [field]: value };
+              }
+              return meal;
+            }),
+          };
+        }
+        return block;
+      }),
+    }));
+  };
+
+  // ----- Supplement handlers -----
+  const addSupplement = (blockIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
+          return {
+            ...block,
+            supplements: [
+              ...block.supplements,
+              { name: "", dosage: "", timing: "", notes: "" },
+            ],
+          };
+        }
+        return block;
+      }),
+    }));
+  };
+
+  const removeSupplement = (blockIndex, supplementIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
+          return {
+            ...block,
+            supplements: block.supplements.filter(
+              (_, i) => i !== supplementIndex
+            ),
+          };
+        }
+        return block;
+      }),
+    }));
+  };
+
+  const handleSupplementChange = (
+    blockIndex,
+    supplementIndex,
+    field,
+    value
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      schedule: prev.schedule.map((block, idx) => {
+        if (idx === blockIndex) {
+          return {
+            ...block,
+            supplements: block.supplements.map((supplement, i) => {
+              if (i === supplementIndex) {
+                return { ...supplement, [field]: value };
+              }
+              return supplement;
+            }),
+          };
+        }
+        return block;
+      }),
+    }));
+  };
+
+  // ----- Form submission -----
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Form submitted:", formData);
-    // Handle form submission
+    // Add your submission logic here (API call, etc.)
   };
 
   return (
@@ -185,7 +391,8 @@ function CreateWorkoutPlan() {
               Create New Workout Plan
             </h1>
             <p className="text-gray-400 mt-1">
-              Design a personalized workout plan for your student
+              Design a comprehensive fitness plan including workouts, meals, and
+              supplements
             </p>
           </div>
         </div>
@@ -232,7 +439,7 @@ function CreateWorkoutPlan() {
                   value={formData.planName}
                   onChange={handleChange}
                   className="w-full bg-gray-900/50 text-white rounded-lg pl-12 pr-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                  placeholder="e.g., Strength Building Program"
+                  placeholder="e.g., Complete Transformation Program"
                 />
               </div>
             </div>
@@ -300,163 +507,436 @@ function CreateWorkoutPlan() {
               onChange={handleChange}
               rows="4"
               className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-              placeholder="Describe the goals and focus of this workout plan..."
+              placeholder="Describe the goals and focus of this comprehensive fitness plan..."
             ></textarea>
           </div>
         </div>
 
-        {/* Workout Schedule */}
+        {/* Daily Schedule */}
         <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-white">
-              Workout Schedule
-            </h2>
+            <h2 className="text-xl font-semibold text-white">Daily Schedule</h2>
             <button
               type="button"
               onClick={addDay}
               className="flex items-center space-x-2 px-4 py-2 bg-violet-600/20 text-violet-400 rounded-lg hover:bg-violet-600/30 transition-colors"
             >
               <FiPlus className="w-5 h-5" />
-              <span>Add Day</span>
+              <span>Add Day Block</span>
             </button>
           </div>
 
-          <div className="space-y-6">
-            {formData.schedule.map((day, dayIndex) => (
+          {/* Render each schedule block */}
+          <div className="space-y-8">
+            {formData.schedule.map((block, blockIndex) => (
               <div
-                key={dayIndex}
+                key={blockIndex}
                 className="bg-gray-900/50 rounded-xl p-6 border border-gray-700/50"
               >
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    <select
-                      value={day.day}
-                      onChange={(e) => {
-                        const newSchedule = [...formData.schedule];
-                        newSchedule[dayIndex].day = e.target.value;
-                        setFormData((prev) => ({
-                          ...prev,
-                          schedule: newSchedule,
-                        }));
-                      }}
-                      className="bg-gray-800/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                    >
-                      {weekDays.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => addExercise(dayIndex)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-violet-600/20 text-violet-400 rounded-lg hover:bg-violet-600/30 transition-colors"
-                    >
-                      <FiPlus className="w-4 h-4" />
-                      <span>Add Exercise</span>
-                    </button>
-                  </div>
+                {/* Days Selection (Multiple) */}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-white">
+                    Select Days
+                  </h3>
                   <button
                     type="button"
-                    onClick={() => removeDay(dayIndex)}
+                    onClick={() => removeDayBlock(blockIndex)}
                     className="p-2 text-gray-400 hover:text-red-400 transition-colors"
                   >
                     <FiTrash2 className="w-5 h-5" />
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  {day.exercises.map((exercise, exerciseIndex) => (
-                    <div
-                      key={exerciseIndex}
-                      className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 bg-gray-800/50 rounded-lg relative group"
-                    >
-                      {/* Exercise Name */}
-                      <div className="md:col-span-2">
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {weekDays.map((dayName) => {
+                    const isChecked = block.days.includes(dayName);
+                    return (
+                      <label
+                        key={dayName}
+                        className="flex items-center space-x-2 px-3 py-1 bg-gray-800/50 rounded-lg cursor-pointer"
+                      >
                         <input
-                          type="text"
-                          value={exercise.name}
-                          onChange={(e) =>
-                            handleExerciseChange(
-                              dayIndex,
-                              exerciseIndex,
-                              "name",
-                              e.target.value
-                            )
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() =>
+                            handleDaysCheckbox(blockIndex, dayName)
                           }
-                          className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                          placeholder="Exercise name"
+                          className="hidden"
                         />
-                      </div>
-
-                      {/* Sets */}
-                      <div>
-                        <input
-                          type="text"
-                          value={exercise.sets}
-                          onChange={(e) =>
-                            handleExerciseChange(
-                              dayIndex,
-                              exerciseIndex,
-                              "sets",
-                              e.target.value
-                            )
+                        <span
+                          className={
+                            isChecked
+                              ? "text-violet-400 font-semibold"
+                              : "text-gray-300"
                           }
-                          className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                          placeholder="Sets"
-                        />
-                      </div>
-
-                      {/* Reps */}
-                      <div>
-                        <input
-                          type="text"
-                          value={exercise.reps}
-                          onChange={(e) =>
-                            handleExerciseChange(
-                              dayIndex,
-                              exerciseIndex,
-                              "reps",
-                              e.target.value
-                            )
-                          }
-                          className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                          placeholder="Reps"
-                        />
-                      </div>
-
-                      {/* Weight */}
-                      <div>
-                        <input
-                          type="text"
-                          value={exercise.weight}
-                          onChange={(e) =>
-                            handleExerciseChange(
-                              dayIndex,
-                              exerciseIndex,
-                              "weight",
-                              e.target.value
-                            )
-                          }
-                          className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                          placeholder="Weight"
-                        />
-                      </div>
-
-                      {/* Remove Exercise Button */}
-                      <div className="flex items-center justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeExercise(dayIndex, exerciseIndex)
-                          }
-                          className="p-2 text-gray-400 hover:text-red-400 transition-colors"
                         >
-                          <FiX className="w-5 h-5" />
-                        </button>
+                          {dayName}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Workouts Section */}
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-medium text-white">Workouts</h4>
+                    <button
+                      type="button"
+                      onClick={() => addExercise(blockIndex)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-violet-600/20 text-violet-400 rounded-lg hover:bg-violet-600/30 transition-colors"
+                    >
+                      <FiPlus className="w-4 h-4" />
+                      <span>Add Exercise</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {block.exercises.map((exercise, exerciseIndex) => (
+                      <div
+                        key={exerciseIndex}
+                        className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 bg-gray-800/50 rounded-lg relative group"
+                      >
+                        {/* Exercise Name */}
+                        <div className="md:col-span-2">
+                          <input
+                            type="text"
+                            value={exercise.name}
+                            onChange={(e) =>
+                              handleExerciseChange(
+                                blockIndex,
+                                exerciseIndex,
+                                "name",
+                                e.target.value
+                              )
+                            }
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                            placeholder="Exercise name"
+                          />
+                        </div>
+
+                        {/* Sets */}
+                        <div>
+                          <input
+                            type="text"
+                            value={exercise.sets}
+                            onChange={(e) =>
+                              handleExerciseChange(
+                                blockIndex,
+                                exerciseIndex,
+                                "sets",
+                                e.target.value
+                              )
+                            }
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                            placeholder="Sets"
+                          />
+                        </div>
+
+                        {/* Reps */}
+                        <div>
+                          <input
+                            type="text"
+                            value={exercise.reps}
+                            onChange={(e) =>
+                              handleExerciseChange(
+                                blockIndex,
+                                exerciseIndex,
+                                "reps",
+                                e.target.value
+                              )
+                            }
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                            placeholder="Reps"
+                          />
+                        </div>
+
+                        {/* Weight */}
+                        <div>
+                          <input
+                            type="text"
+                            value={exercise.weight}
+                            onChange={(e) =>
+                              handleExerciseChange(
+                                blockIndex,
+                                exerciseIndex,
+                                "weight",
+                                e.target.value
+                              )
+                            }
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                            placeholder="Weight"
+                          />
+                        </div>
+
+                        {/* Remove Exercise Button */}
+                        <div className="flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeExercise(blockIndex, exerciseIndex)
+                            }
+                            className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <FiX className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+
+                {/* Meals Section */}
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-medium text-white">Meals</h4>
+                    <button
+                      type="button"
+                      onClick={() => addMeal(blockIndex)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-violet-600/20 text-violet-400 rounded-lg hover:bg-violet-600/30 transition-colors"
+                    >
+                      <FiCoffee className="w-4 h-4" />
+                      <span>Add Meal</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {block.meals.map((meal, mealIndex) => (
+                      <div
+                        key={mealIndex}
+                        className="bg-gray-800/50 rounded-lg p-4 space-y-4"
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {/* Meal Type */}
+                          <div>
+                            <select
+                              value={meal.type}
+                              onChange={(e) =>
+                                handleMealChange(
+                                  blockIndex,
+                                  mealIndex,
+                                  "type",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                            >
+                              {mealTypes.map((typeOption) => (
+                                <option key={typeOption} value={typeOption}>
+                                  {typeOption}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Meal Time */}
+                          <div>
+                            <input
+                              type="time"
+                              value={meal.time}
+                              onChange={(e) =>
+                                handleMealChange(
+                                  blockIndex,
+                                  mealIndex,
+                                  "time",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Calories */}
+                          <div>
+                            <input
+                              type="number"
+                              value={meal.calories}
+                              onChange={(e) =>
+                                handleMealChange(
+                                  blockIndex,
+                                  mealIndex,
+                                  "calories",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Calories"
+                              className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Remove Meal Button */}
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => removeMeal(blockIndex, mealIndex)}
+                              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                            >
+                              <FiX className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Macronutrients */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <input
+                            type="number"
+                            value={meal.protein}
+                            onChange={(e) =>
+                              handleMealChange(
+                                blockIndex,
+                                mealIndex,
+                                "protein",
+                                e.target.value
+                              )
+                            }
+                            placeholder="Protein (g)"
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                          />
+                          <input
+                            type="number"
+                            value={meal.carbs}
+                            onChange={(e) =>
+                              handleMealChange(
+                                blockIndex,
+                                mealIndex,
+                                "carbs",
+                                e.target.value
+                              )
+                            }
+                            placeholder="Carbs (g)"
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                          />
+                          <input
+                            type="number"
+                            value={meal.fats}
+                            onChange={(e) =>
+                              handleMealChange(
+                                blockIndex,
+                                mealIndex,
+                                "fats",
+                                e.target.value
+                              )
+                            }
+                            placeholder="Fats (g)"
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Additional Notes / Food Items */}
+                        <textarea
+                          value={meal.notes}
+                          onChange={(e) =>
+                            handleMealChange(
+                              blockIndex,
+                              mealIndex,
+                              "notes",
+                              e.target.value
+                            )
+                          }
+                          placeholder="List food items and notes..."
+                          className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                          rows="2"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Supplements Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-medium text-white">
+                      Supplements
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => addSupplement(blockIndex)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-violet-600/20 text-violet-400 rounded-lg hover:bg-violet-600/30 transition-colors"
+                    >
+                      <FiPackage className="w-4 h-4" />
+                      <span>Add Supplement</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {block.supplements.map((supplement, supplementIndex) => (
+                      <div
+                        key={supplementIndex}
+                        className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-800/50 rounded-lg"
+                      >
+                        {/* Supplement Name */}
+                        <div>
+                          <select
+                            value={supplement.name}
+                            onChange={(e) =>
+                              handleSupplementChange(
+                                blockIndex,
+                                supplementIndex,
+                                "name",
+                                e.target.value
+                              )
+                            }
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                          >
+                            <option value="">Select Supplement</option>
+                            {commonSupplements.map((suppName) => (
+                              <option key={suppName} value={suppName}>
+                                {suppName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Dosage */}
+                        <div>
+                          <input
+                            type="text"
+                            value={supplement.dosage}
+                            onChange={(e) =>
+                              handleSupplementChange(
+                                blockIndex,
+                                supplementIndex,
+                                "dosage",
+                                e.target.value
+                              )
+                            }
+                            placeholder="Dosage (e.g., 5g, 1 capsule)"
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Timing */}
+                        <div>
+                          <input
+                            type="time"
+                            value={supplement.timing}
+                            onChange={(e) =>
+                              handleSupplementChange(
+                                blockIndex,
+                                supplementIndex,
+                                "timing",
+                                e.target.value
+                              )
+                            }
+                            className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Remove Supplement Button */}
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeSupplement(blockIndex, supplementIndex)
+                            }
+                            className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <FiX className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
