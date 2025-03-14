@@ -746,7 +746,7 @@ function FindGym() {
                         />
                       </button>
                       <Link
-                        to={`/register-gym/${gym.id}`}
+                        to={`/gym-regi/${gym.id}`}
                         className="flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
                       >
                         Register Now

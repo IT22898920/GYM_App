@@ -64,6 +64,7 @@ import GymStudents from "./pages/instructor/Student/GymStudents";
 import AddMemberForm from "./pages/gymowner/AddMemberForm";
 
 import FinanceAdmin from "./pages/admin/Finance";
+import CustomerRegisterGym from "./pages/CustomerRegisterGym";
 
 
 function App() {
@@ -171,6 +172,7 @@ function AppContent() {
         <Route path="/view-my-workout" element={<ViewMyWorkout />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/gym-regi/:gymId" element={<CustomerRegisterGym />} />
       </Routes>
 
       {!isDashboardRoute && <Footer />}

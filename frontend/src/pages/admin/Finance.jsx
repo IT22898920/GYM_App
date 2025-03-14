@@ -57,9 +57,7 @@ const CARD_ELEMENT_OPTIONS = {
       fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
       fontSmoothing: "antialiased",
       fontSize: "16px",
-      "::placeholder": {
-        color: "#aab7c4",
-      },
+      "::placeholder": { color: "#aab7c4" },
     },
     invalid: {
       color: "#fa755a",
@@ -82,10 +80,10 @@ const pieData = [
   { name: "Memberships", value: 60 },
   { name: "Classes", value: 25 },
   { name: "Instructor Packages", value: 15 },
-  { name: "Gym Registration", value: 20 }, // New data point for gym registration
+  { name: "Gym Registration", value: 20 },
 ];
 
-const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b"]; // New color for gym registration
+const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b"];
 
 function PaymentForm({ amount, onSuccess, onCancel, paymentType }) {
   const stripe = useStripe();
@@ -96,31 +94,23 @@ function PaymentForm({ amount, onSuccess, onCancel, paymentType }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (paymentMethod === "manual") {
       onSuccess({ paymentMethod: "manual", amount, type: paymentType });
       return;
     }
-
-    if (!stripe || !elements) {
-      return;
-    }
-
+    if (!stripe || !elements) return;
     setProcessing(true);
     setError(null);
-
     try {
       const { error } = await stripe.createPaymentMethod({
         type: "card",
         card: elements.getElement(CardElement),
       });
-
       if (error) {
         setError(error.message);
         setProcessing(false);
         return;
       }
-
       onSuccess({ paymentMethod: "card", amount, type: paymentType });
     } catch (err) {
       setError("An unexpected error occurred.");
@@ -136,7 +126,6 @@ function PaymentForm({ amount, onSuccess, onCancel, paymentType }) {
           <h3 className="text-lg font-medium text-white">Payment Method</h3>
           <span className="text-2xl font-bold text-white">${amount}</span>
         </div>
-
         <div className="space-y-4">
           <label
             className={`block p-4 rounded-lg border cursor-pointer transition-all ${
@@ -163,7 +152,6 @@ function PaymentForm({ amount, onSuccess, onCancel, paymentType }) {
               </div>
             </div>
           </label>
-
           <label
             className={`block p-4 rounded-lg border cursor-pointer transition-all ${
               paymentMethod === "manual"
@@ -190,7 +178,6 @@ function PaymentForm({ amount, onSuccess, onCancel, paymentType }) {
             </div>
           </label>
         </div>
-
         {paymentMethod === "card" && (
           <div className="mt-4">
             <div className="p-4 bg-gray-700 rounded-lg">
@@ -200,17 +187,13 @@ function PaymentForm({ amount, onSuccess, onCancel, paymentType }) {
           </div>
         )}
       </div>
-
       <div className="flex gap-3">
         <button
           type="submit"
           disabled={processing}
-          className={`flex-1 p-3 bg-violet-600 text-white rounded-lg font-medium transition
-            ${
-              processing
-                ? "opacity-75 cursor-not-allowed"
-                : "hover:bg-violet-700"
-            }`}
+          className={`flex-1 p-3 bg-violet-600 text-white rounded-lg font-medium transition ${
+            processing ? "opacity-75 cursor-not-allowed" : "hover:bg-violet-700"
+          }`}
         >
           {processing ? "Processing..." : "Complete Payment"}
         </button>
@@ -284,7 +267,7 @@ export default function Finance() {
       date: "2024-03-10",
       status: "completed",
       method: "card",
-      type: "gym_registration", // New type for gym registration
+      type: "gym_registration",
       plan: "Full Gym Access",
     },
   ]);
@@ -312,6 +295,33 @@ export default function Finance() {
         color: "yellow",
       },
     ],
+    membership: [
+      {
+        title: "Membership Revenue",
+        value: "$1,200.00",
+        change: "+10%",
+        icon: FiDollarSign,
+        color: "green",
+      },
+    ],
+    instructor_package: [
+      {
+        title: "Instructor Package Revenue",
+        value: "$800.00",
+        change: "+15%",
+        icon: FiDollarSign,
+        color: "green",
+      },
+    ],
+    class: [
+      {
+        title: "Class Payment Revenue",
+        value: "$600.00",
+        change: "+8%",
+        icon: FiDollarSign,
+        color: "green",
+      },
+    ],
     gym_registration: [
       {
         title: "Gym Registration Revenue",
@@ -322,72 +332,59 @@ export default function Finance() {
       },
     ],
   };
-const handleExportPDF = () => {
-  const doc = new jsPDF();
 
-  // Add title
-  doc.setFontSize(20);
-  doc.text("Financial Report", 20, 20);
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text("Financial Report", 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+    const tableColumn = ["Member", "Amount", "Date", "Type", "Status"];
+    const tableRows = payments.map((payment) => [
+      payment.member,
+      `$${payment.amount}`,
+      payment.date,
+      payment.type,
+      payment.status,
+    ]);
+    doc.autoTable({
+      startY: 40,
+      head: [tableColumn],
+      body: tableRows,
+      theme: "grid",
+      styles: { fontSize: 8 },
+    });
+    doc.save("financial-report.pdf");
+  };
 
-  // Add date
-  doc.setFontSize(12);
-  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+  const handleExportCSV = () => {
+    const headers = ["Member", "Amount", "Date", "Type", "Status", "Method"];
+    const csvData = payments.map((payment) => [
+      payment.member,
+      payment.amount,
+      payment.date,
+      payment.type,
+      payment.status,
+      payment.method,
+    ]);
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map((row) => row.join(",")),
+    ].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "financial-report.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-  // Add table
-  const tableColumn = ["Member", "Amount", "Date", "Type", "Status"];
-  const tableRows = payments.map((payment) => [
-    payment.member,
-    `$${payment.amount}`,
-    payment.date,
-    payment.type,
-    payment.status,
-  ]);
-
-  doc.autoTable({
-    startY: 40,
-    head: [tableColumn],
-    body: tableRows,
-    theme: "grid",
-    styles: { fontSize: 8 },
-  });
-
-  // Save the PDF
-  doc.save("financial-report.pdf");
-};
-
-const handleExportCSV = () => {
-  // Convert data to CSV format
-  const headers = ["Member", "Amount", "Date", "Type", "Status", "Method"];
-  const csvData = payments.map((payment) => [
-    payment.member,
-    payment.amount,
-    payment.date,
-    payment.type,
-    payment.status,
-    payment.method,
-  ]);
-
-  // Create CSV content
-  const csvContent = [
-    headers.join(","),
-    ...csvData.map((row) => row.join(",")),
-  ].join("\n");
-
-  // Create and download the file
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", "financial-report.csv");
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-const handlePrint = () => {
-  window.print();
-};
+  const handlePrint = () => {
+    window.print();
+  };
 
   const handlePaymentSuccess = (paymentDetails) => {
     console.log("Payment successful:", paymentDetails);
@@ -456,7 +453,7 @@ const handlePrint = () => {
           { id: "membership", label: "Memberships" },
           { id: "instructor_package", label: "Instructor Packages" },
           { id: "class", label: "Class Payments" },
-          { id: "gym_registration", label: "Gym Registration" }, // New Tab
+          { id: "gym_registration", label: "Gym Registration" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -473,59 +470,60 @@ const handlePrint = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats[activeTab].map((stat, index) => (
-          <div
-            key={index}
-            className="group bg-gray-800/40 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50 hover:bg-gray-800/70 transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_30px_rgba(124,58,237,0.2)] relative overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between mb-4">
-                <div
-                  className={`p-3 rounded-lg bg-${stat.color}-500/10 group-hover:scale-110 transition-transform duration-300`}
-                >
-                  <stat.icon className={`h-6 w-6 text-${stat.color}-400`} />
+      {stats[activeTab] && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {stats[activeTab].map((stat, index) => (
+            <div
+              key={index}
+              className="group bg-gray-800/40 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50 hover:bg-gray-800/70 transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_30px_rgba(124,58,237,0.2)] relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className={`p-3 rounded-lg bg-${stat.color}-500/10 group-hover:scale-110 transition-transform duration-300`}
+                  >
+                    <stat.icon className={`h-6 w-6 text-${stat.color}-400`} />
+                  </div>
+                  <button className="text-gray-400 hover:text-white transition-colors">
+                    <FiMoreVertical className="h-5 w-5" />
+                  </button>
                 </div>
-                <button className="text-gray-400 hover:text-white transition-colors">
-                  <FiMoreVertical className="h-5 w-5" />
-                </button>
-              </div>
-              <div>
-                <h3 className="text-gray-400 text-sm font-medium mb-2">
-                  {stat.title}
-                </h3>
-                <div className="flex items-center justify-between">
-                  <span className="text-3xl font-bold text-white">
-                    {stat.value}
-                  </span>
-                  {stat.change && (
-                    <div
-                      className={`flex items-center text-sm ${
-                        stat.change.startsWith("+")
-                          ? "text-green-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {stat.change.startsWith("+") ? (
-                        <FiTrendingUp className="h-4 w-4 mr-1" />
-                      ) : (
-                        <FiTrendingUp className="h-4 w-4 mr-1" />
-                      )}
-                      {stat.change}
-                    </div>
-                  )}
+                <div>
+                  <h3 className="text-gray-400 text-sm font-medium mb-2">
+                    {stat.title}
+                  </h3>
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xl font-bold text-white">
+                      {stat.value}
+                    </span>
+                    {stat.change && (
+                      <div
+                        className={`flex items-center text-sm ${
+                          stat.change.startsWith("+")
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {stat.change.startsWith("+") ? (
+                          <FiTrendingUp className="h-4 w-4 mr-1" />
+                        ) : (
+                          <FiTrendingUp className="h-4 w-4 mr-1" />
+                        )}
+                        {stat.change}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Charts Section */}
       {showCharts && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Revenue Trend Chart */}
           <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-medium text-white">Revenue Trend</h3>
@@ -567,8 +565,6 @@ const handlePrint = () => {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-
-          {/* Revenue Distribution Chart */}
           <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50">
             <h3 className="text-lg font-medium text-white mb-6">
               Revenue Distribution
@@ -656,8 +652,6 @@ const handlePrint = () => {
             </button>
           </div>
         </div>
-
-        {/* Advanced Filters */}
         {showAdvancedFilters && (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-900/50 rounded-lg">
             <div>
@@ -766,7 +760,7 @@ const handlePrint = () => {
                           payment.type === "membership"
                             ? "bg-blue-500/10 text-blue-400"
                             : payment.type === "gym_registration"
-                            ? "bg-orange-500/10 text-orange-400" // New class for gym registration
+                            ? "bg-orange-500/10 text-orange-400"
                             : "bg-green-500/10 text-green-400"
                         }`}
                       >
@@ -841,7 +835,6 @@ const handlePrint = () => {
             >
               <div className="absolute inset-0 bg-gray-900 opacity-75"></div>
             </div>
-
             <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 rounded-2xl border border-gray-700 shadow-xl">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-white">
@@ -858,7 +851,6 @@ const handlePrint = () => {
                   <FiXCircle className="w-6 h-6" />
                 </button>
               </div>
-
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">
@@ -874,13 +866,9 @@ const handlePrint = () => {
                       Instructor Package
                     </option>
                     <option value="class">Class Payment</option>
-                    <option value="gym_registration">
-                      Gym Registration
-                    </option>{" "}
-                    {/* New Option */}
+                    <option value="gym_registration">Gym Registration</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">
                     Amount ($)
@@ -895,7 +883,6 @@ const handlePrint = () => {
                     min="0"
                   />
                 </div>
-
                 {amount && (
                   <Elements stripe={stripePromise}>
                     <PaymentForm
