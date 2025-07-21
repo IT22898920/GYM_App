@@ -4,6 +4,8 @@ import {
   Route,
   useLocation,
 } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { AlertProvider } from "./contexts/AlertContext";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home/Home";
@@ -13,6 +15,9 @@ import Contact from "./pages/Contact/Contact";
 import About from "./pages/About/About";
 import ApplyInstructor from "./pages/ApplyInstructor/ApplyInstructor";
 import RegisterGym from "./pages/RegisterGym/RegisterGym";
+import GymOwnerLogin from "./pages/GymOwnerLogin";
+import InstructorLogin from "./pages/InstructorLogin";
+import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./layouts/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
 import Instructors from "./pages/admin/Instructors";
@@ -24,6 +29,7 @@ import FindGym from "./pages/FindGym";
 import ClassSchedule from "./pages/ClassSchedule";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import GymRegistration from "./pages/GymRegistration";
+import TestGymRegistration from "./pages/TestGymRegistration";
 import CustomerProfile from "./pages/CustomerProfile";
 import CustomerWorkouts from "./pages/Workouts";
 
@@ -70,7 +76,11 @@ import CustomerRegisterGym from "./pages/CustomerRegisterGym";
 function App() {
   return (
     <Router>
-      <AppContent />
+      <AlertProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </AlertProvider>
     </Router>
   );
 }
@@ -161,8 +171,12 @@ function AppContent() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/gym-owner-login" element={<GymOwnerLogin />} />
+        <Route path="/instructor-login" element={<InstructorLogin />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/apply-instructor" element={<ApplyInstructor />} />
         <Route path="/register-gym" element={<RegisterGym />} />
+        <Route path="/test-gym-registration" element={<TestGymRegistration />} />
         <Route path="/find-gym" element={<FindGym />} />
         <Route path="/classes" element={<ClassSchedule />} />
         <Route path="/book-class/:classId" element={<BookingConfirmation />} />

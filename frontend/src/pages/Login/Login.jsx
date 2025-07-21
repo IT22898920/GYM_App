@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   FiArrowLeft,
   FiMail,
@@ -11,6 +12,10 @@ import {
 } from "react-icons/fi";
 
 function Login() {
+  const { login, loading, error } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -21,6 +26,9 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect to intended page after login
+  const from = location.state?.from?.pathname || "/";
 
   useEffect(() => {
     setIsLoaded(true);
@@ -63,10 +71,14 @@ function Login() {
 
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setIsLoading(false);
-      console.log("Form submitted:", formData);
+      try {
+        await login(formData);
+        // AuthContext will handle redirection based on user role
+      } catch (err) {
+        setErrors({ submit: err.message || 'Login failed. Please try again.' });
+      } finally {
+        setIsLoading(false);
+      }
     } else {
       setErrors(newErrors);
     }
@@ -225,6 +237,16 @@ function Login() {
                     <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-violet-400 group-hover:w-full transition-all duration-300"></span>
                   </Link>
                 </div>
+
+                {/* Error Display */}
+                {(errors.submit || error) && (
+                  <div className="p-3 bg-red-900/50 border border-red-500/50 rounded-lg">
+                    <p className="text-red-400 text-sm flex items-center">
+                      <span className="w-2 h-2 bg-red-400 rounded-full mr-2"></span>
+                      {errors.submit || error}
+                    </p>
+                  </div>
+                )}
 
                 {/* Submit Button */}
                 <button

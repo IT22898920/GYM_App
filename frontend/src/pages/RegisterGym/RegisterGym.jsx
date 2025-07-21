@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { gymService, formatGymDataForAPI, validateGymData } from "../../services/gymService";
 import {
   FiArrowLeft,
   FiMail,
@@ -21,6 +22,7 @@ import {
 import MapComponent from "../../components/MapComponent"; // Assuming this exists
 
 function RegisterGym() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     gymName: "",
     gymType: "",
@@ -58,6 +60,9 @@ function RegisterGym() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [registeredGymId, setRegisteredGymId] = useState(null);
   const [previewImages, setPreviewImages] = useState({
     logo: null,
     photos: [],
@@ -233,80 +238,164 @@ function RegisterGym() {
     }));
   };
 
-  const validateForm = () => {
+  const validateCurrentStep = () => {
     const newErrors = {};
 
-    // Basic Info Validation
-    if (!formData.gymName.trim()) newErrors.gymName = "Gym name is required";
-    if (!formData.gymType) newErrors.gymType = "Gym type is required";
-    if (!formData.address.trim()) newErrors.address = "Address is required";
-    if (!formData.city.trim()) newErrors.city = "City is required";
-    if (!formData.state.trim()) newErrors.state = "State is required";
-    if (!formData.zipCode.trim()) newErrors.zipCode = "ZIP code is required";
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
+    switch (currentStep) {
+      case 1: // Basic Info
+        if (!formData.gymName.trim()) newErrors.gymName = "Gym name is required";
+        if (!formData.gymType) newErrors.gymType = "Gym type is required";
+        if (!formData.address.trim()) newErrors.address = "Address is required";
+        if (!formData.city.trim()) newErrors.city = "City is required";
+        if (!formData.state.trim()) newErrors.state = "State is required";
+        if (!formData.zipCode.trim()) newErrors.zipCode = "ZIP code is required";
+        if (!formData.email.trim()) {
+          newErrors.email = "Email is required";
+        } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+          newErrors.email = "Email is invalid";
+        }
+        if (!formData.phone.trim()) {
+          newErrors.phone = "Phone number is required";
+        } else if (!/^\+?[\d\s-]{10,}$/.test(formData.phone)) {
+          newErrors.phone = "Phone number is invalid";
+        }
+        break;
+
+      case 2: // Facilities & Classes
+        if (formData.facilities.length === 0)
+          newErrors.facilities = "Please select at least one facility";
+        if (formData.classTypes.length === 0)
+          newErrors.classTypes = "Please select at least one class type";
+        break;
+
+      case 3: // Membership & Pricing
+        if (formData.membershipPlans.length === 0) {
+          newErrors.membershipPlans = "Please add at least one membership plan";
+        } else {
+          formData.membershipPlans.forEach((plan, index) => {
+            if (!plan.name.trim())
+              newErrors[`membershipPlan.name.${index}`] = "Plan name is required";
+            if (!plan.price.trim())
+              newErrors[`membershipPlan.price.${index}`] = "Price is required";
+          });
+        }
+        break;
+
+      case 4: // Media & Location
+        // Made logo and photos optional for now
+        break;
+
+      case 5: // Terms
+        if (!formData.termsAccepted)
+          newErrors.termsAccepted = "Please accept the terms and conditions";
+        if (!formData.privacyAccepted)
+          newErrors.privacyAccepted = "Please accept the privacy policy";
+        break;
+
+      case 6: // Payment (Skip for now, just for demo)
+        // Payment validation can be added later
+        break;
     }
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    } else if (!/^\+?[\d\s-]{10,}$/.test(formData.phone)) {
-      newErrors.phone = "Phone number is invalid";
-    }
-
-    // Facilities & Classes Validation
-    if (formData.facilities.length === 0)
-      newErrors.facilities = "Please select at least one facility";
-    if (formData.classTypes.length === 0)
-      newErrors.classTypes = "Please select at least one class type";
-
-    // Membership & Pricing Validation
-    if (formData.membershipPlans.length === 0) {
-      newErrors.membershipPlans = "Please add at least one membership plan";
-    } else {
-      formData.membershipPlans.forEach((plan, index) => {
-        if (!plan.name.trim())
-          newErrors[`membershipPlan.name.${index}`] = "Plan name is required";
-        if (!plan.price.trim())
-          newErrors[`membershipPlan.price.${index}`] = "Price is required";
-      });
-    }
-    if (formData.paymentMethods.length === 0)
-      newErrors.paymentMethods = "Please select at least one payment method";
-
-    // Media Validation
-    if (!formData.logo) newErrors.logo = "Gym logo is required";
-    if (formData.photos.length === 0)
-      newErrors.photos = "Please upload at least one gym photo";
-
-    // Terms Validation
-    if (!formData.termsAccepted)
-      newErrors.termsAccepted = "Please accept the terms and conditions";
-    if (!formData.privacyAccepted)
-      newErrors.privacyAccepted = "Please accept the privacy policy";
-
-    // Payment Validation
-    if (!formData.paymentMethod)
-      newErrors.paymentMethod = "Please select a payment method";
 
     return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const newErrors = validateForm();
+    setSubmitError("");
 
-    if (Object.keys(newErrors).length === 0) {
-      setIsSubmitting(true);
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate API call
+    // Validate form data
+    const validation = validateGymData(formData);
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Format data for API
+      const apiData = formatGymDataForAPI(formData);
+      
+      // Register gym
+      const response = await gymService.registerGym(apiData);
+      
+      console.log("Gym registered successfully:", response);
+      
+      // If we have a logo, upload it
+      if (formData.logo && response.data._id) {
+        try {
+          const logoResponse = await gymService.uploadGymLogo(
+            response.data._id,
+            formData.logo
+          );
+          console.log("Logo uploaded:", logoResponse);
+        } catch (logoError) {
+          console.warn("Logo upload failed:", logoError);
+          // Don't fail the whole process if logo upload fails
+        }
+      }
+
+      // If we have images, upload them
+      if (formData.photos && formData.photos.length > 0 && response.data._id) {
+        try {
+          const imageResponse = await gymService.uploadGymImages(
+            response.data._id,
+            formData.photos,
+            [] // captions can be added later
+          );
+          console.log("Images uploaded:", imageResponse);
+        } catch (imageError) {
+          console.warn("Image upload failed:", imageError);
+          // Don't fail the whole process if image upload fails
+        }
+      }
+
+      setSubmitSuccess(true);
+      setRegisteredGymId(response.data._id);
+      
+      // Show success message for a moment, then redirect based on user role
+      setTimeout(() => {
+        // Redirect to profile page for customers (they can't access gym-owner dashboard yet)
+        const redirectPath = localStorage.getItem('userRole') === 'customer' ? '/profile' : '/gym-owner';
+        navigate(redirectPath, { 
+          state: { 
+            message: "Gym registered successfully! Your application is being reviewed. You will be notified once approved." 
+          } 
+        });
+      }, 3000);
+
+    } catch (error) {
+      console.error("Registration error:", error);
+      setSubmitError(
+        error.message || "Registration failed. Please try again."
+      );
+      
+      // If there are field-specific errors, show them
+      if (error.errors && Array.isArray(error.errors)) {
+        const fieldErrors = {};
+        error.errors.forEach(err => {
+          if (err.field) {
+            fieldErrors[err.field] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+      }
+    } finally {
       setIsSubmitting(false);
-      console.log("Form submitted:", formData);
-    } else {
-      setErrors(newErrors);
     }
   };
 
   const nextStep = () => {
+    // Validate current step before proceeding
+    const stepErrors = validateCurrentStep();
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors);
+      return;
+    }
+    
+    // Clear errors and proceed
+    setErrors({});
     setCurrentStep((prev) => Math.min(prev + 1, steps.length));
   };
 
@@ -317,6 +406,32 @@ function RegisterGym() {
   const handleLocationChange = (newLocation) => {
     setFormData((prev) => ({ ...prev, location: newLocation }));
   };
+
+  // Success screen
+  if (submitSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 via-gray-900/50 to-emerald-900/20"></div>
+        </div>
+        <div className="max-w-md mx-auto text-center relative z-10">
+          <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-gray-700/50">
+            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FiCheck className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-4">
+              Registration Successful!
+            </h1>
+            <p className="text-gray-300 mb-6">
+              Your gym has been registered successfully. Our team will review your application and get back to you within 2-3 business days.
+            </p>
+            <div className="animate-spin w-6 h-6 border-2 border-gray-600 border-t-white rounded-full mx-auto"></div>
+            <p className="text-gray-400 text-sm mt-2">Redirecting to dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const renderStepContent = (step) => {
     switch (step) {
@@ -1162,6 +1277,13 @@ function RegisterGym() {
           <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl p-8 shadow-2xl relative overflow-hidden border border-gray-700/50">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-indigo-500/10 animate-pulse-slow"></div>
             <div className="relative">
+              {/* Error Message */}
+              {submitError && (
+                <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+                  <p className="text-red-400 text-sm">{submitError}</p>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-8">
                 {renderStepContent(currentStep)}
                 <div className="flex justify-between pt-8">
