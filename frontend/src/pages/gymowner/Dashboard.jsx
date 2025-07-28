@@ -10,6 +10,11 @@ import {
   FiMoreVertical,
   FiTrendingUp,
   FiClock,
+  FiEdit3,
+  FiSettings,
+  FiImage,
+  FiMapPin,
+  FiPhone,
 } from "react-icons/fi";
 
 function Dashboard() {
@@ -122,7 +127,132 @@ function Dashboard() {
         ))}
       </div>
 
-      {/* Content will be added here */}
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Gym Management */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-white">Gym Management</h2>
+            <FiSettings className="h-5 w-5 text-violet-400" />
+          </div>
+          
+          <div className="space-y-4">
+            <Link
+              to="/gym-owner/edit-gym-details"
+              className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors group"
+            >
+              <div className="flex items-center">
+                <div className="p-2 bg-violet-500/10 rounded-lg mr-3 group-hover:bg-violet-500/20 transition-colors">
+                  <FiEdit3 className="h-5 w-5 text-violet-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-medium">Edit Gym Details</h3>
+                  <p className="text-gray-400 text-sm">Update gym information, facilities, and services</p>
+                </div>
+              </div>
+              <div className="text-gray-400 group-hover:text-white transition-colors">
+                →
+              </div>
+            </Link>
+
+            <Link
+              to="/gym-owner/manage-images"
+              className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors group"
+            >
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-500/10 rounded-lg mr-3 group-hover:bg-blue-500/20 transition-colors">
+                  <FiImage className="h-5 w-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-medium">Manage Photos & Logo</h3>
+                  <p className="text-gray-400 text-sm">Upload and manage gym photos and logo</p>
+                </div>
+              </div>
+              <div className="text-gray-400 group-hover:text-white transition-colors">
+                →
+              </div>
+            </Link>
+
+            <Link
+              to="/gym-owner/update-location"
+              className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors group"
+            >
+              <div className="flex items-center">
+                <div className="p-2 bg-green-500/10 rounded-lg mr-3 group-hover:bg-green-500/20 transition-colors">
+                  <FiMapPin className="h-5 w-5 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-medium">Update Location</h3>
+                  <p className="text-gray-400 text-sm">Update gym address and map location</p>
+                </div>
+              </div>
+              <div className="text-gray-400 group-hover:text-white transition-colors">
+                →
+              </div>
+            </Link>
+
+            <Link
+              to="/gym-owner/contact-info"
+              className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors group"
+            >
+              <div className="flex items-center">
+                <div className="p-2 bg-amber-500/10 rounded-lg mr-3 group-hover:bg-amber-500/20 transition-colors">
+                  <FiPhone className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-medium">Contact Information</h3>
+                  <p className="text-gray-400 text-sm">Update phone, email, and social media</p>
+                </div>
+              </div>
+              <div className="text-gray-400 group-hover:text-white transition-colors">
+                →
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-white">Recent Activity</h2>
+            <FiTrendingUp className="h-5 w-5 text-green-400" />
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+              <div className="flex items-center">
+                <div className="w-2 h-2 bg-green-400 rounded-full mr-3"></div>
+                <span className="text-gray-300 text-sm">New member registration</span>
+              </div>
+              <span className="text-gray-400 text-xs">2 min ago</span>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+              <div className="flex items-center">
+                <div className="w-2 h-2 bg-blue-400 rounded-full mr-3"></div>
+                <span className="text-gray-300 text-sm">Class booking confirmed</span>
+              </div>
+              <span className="text-gray-400 text-xs">15 min ago</span>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+              <div className="flex items-center">
+                <div className="w-2 h-2 bg-violet-400 rounded-full mr-3"></div>
+                <span className="text-gray-300 text-sm">Payment received</span>
+              </div>
+              <span className="text-gray-400 text-xs">1 hour ago</span>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+              <div className="flex items-center">
+                <div className="w-2 h-2 bg-amber-400 rounded-full mr-3"></div>
+                <span className="text-gray-300 text-sm">Equipment maintenance due</span>
+              </div>
+              <span className="text-gray-400 text-xs">3 hours ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

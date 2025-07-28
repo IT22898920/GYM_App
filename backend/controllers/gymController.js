@@ -1,6 +1,7 @@
 import Gym from '../models/Gym.js';
 import User from '../models/User.js';
 import { sendGymApprovalEmail, sendGymRejectionEmail, sendGymPendingEmail } from '../utils/emailService.js';
+import { deleteFromCloudinary } from '../config/cloudinary.js';
 
 // Upload gym logo
 export const uploadGymLogo = async (req, res) => {
@@ -266,9 +267,15 @@ export const getAllGyms = async (req, res) => {
     // Status filter
     if (status) {
       filter.status = status;
-    } else {
-      filter.status = 'approved'; // Only show approved gyms by default
+    } else if (!req.user || req.user.role !== 'admin') {
+      // Only show approved gyms by default for non-admin users
+      filter.status = 'approved';
     }
+    // Admin users can see all gyms without status filter
+    
+    // Debug logging
+    console.log('getAllGyms - User role:', req.user?.role || 'No user');
+    console.log('getAllGyms - Filter applied:', filter);
 
     // Verification filter
     if (verified) {
@@ -295,14 +302,14 @@ export const getAllGyms = async (req, res) => {
       filter.services = { $in: servicesArray };
     }
 
-    let query = Gym.find(filter).populate('owner', 'firstName lastName email');
+    let query = Gym.find(filter).populate('owner', 'firstName lastName email role');
 
     // Text search
     if (search) {
       query = Gym.find({
         ...filter,
         $text: { $search: search }
-      }).populate('owner', 'firstName lastName email');
+      }).populate('owner', 'firstName lastName email role');
     }
 
     // Location-based search
@@ -311,18 +318,15 @@ export const getAllGyms = async (req, res) => {
       const lng = parseFloat(longitude);
       const radiusInMeters = parseFloat(radius) * 1000; // Convert km to meters
 
+      // Use $geoWithin with $centerSphere instead of $near to avoid sorting issues
       query = Gym.find({
         ...filter,
         location: {
-          $near: {
-            $geometry: {
-              type: 'Point',
-              coordinates: [lng, lat]
-            },
-            $maxDistance: radiusInMeters
+          $geoWithin: {
+            $centerSphere: [[lng, lat], radiusInMeters / 6378100] // Convert to radians
           }
         }
-      }).populate('owner', 'firstName lastName email');
+      }).populate('owner', 'firstName lastName email role');
     }
 
     // Pagination
@@ -333,7 +337,27 @@ export const getAllGyms = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Get total count for pagination
-    const total = await Gym.countDocuments(filter);
+    let total;
+    if (search) {
+      total = await Gym.countDocuments({
+        ...filter,
+        $text: { $search: search }
+      });
+    } else if (latitude && longitude) {
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const radiusInMeters = parseFloat(radius) * 1000;
+      total = await Gym.countDocuments({
+        ...filter,
+        location: {
+          $geoWithin: {
+            $centerSphere: [[lng, lat], radiusInMeters / 6378100] // Convert to radians
+          }
+        }
+      });
+    } else {
+      total = await Gym.countDocuments(filter);
+    }
 
     res.status(200).json({
       success: true,
@@ -779,6 +803,118 @@ export const getGymDashboard = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch gym dashboard',
+      error: error.message
+    });
+  }
+};
+
+// Delete individual gym image
+export const deleteGymImage = async (req, res) => {
+  try {
+    const { id, imageId } = req.params;
+    // Decode the imageId in case it was URL encoded
+    const decodedImageId = decodeURIComponent(imageId);
+    
+    console.log('Delete image request:', {
+      gymId: id,
+      originalImageId: imageId,
+      decodedImageId: decodedImageId
+    });
+
+    // Find the gym first to check permissions and get image details
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete images for this gym'
+      });
+    }
+
+    // Find the image in the gym's images array
+    console.log('Gym images:', gym.images.map(img => ({
+      _id: img._id.toString(),
+      publicId: img.publicId
+    })));
+    
+    const imageToDelete = gym.images.find(img => 
+      img.publicId === decodedImageId || img._id.toString() === decodedImageId
+    );
+
+    console.log('Image to delete:', imageToDelete);
+
+    if (!imageToDelete) {
+      return res.status(404).json({
+        success: false,
+        message: 'Image not found'
+      });
+    }
+
+    try {
+      // Delete from Cloudinary first
+      await deleteFromCloudinary(imageToDelete.publicId);
+    } catch (cloudinaryError) {
+      console.error('Error deleting from Cloudinary:', cloudinaryError);
+      // Continue with database deletion even if Cloudinary deletion fails
+    }
+
+    // Use findByIdAndUpdate to avoid version conflicts
+    // Check if decodedImageId is a valid ObjectId format
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(decodedImageId);
+    
+    let updateQuery;
+    if (isObjectId) {
+      // If it's a valid ObjectId, check both _id and publicId
+      updateQuery = {
+        $pull: {
+          images: {
+            $or: [
+              { publicId: decodedImageId },
+              { _id: decodedImageId }
+            ]
+          }
+        }
+      };
+    } else {
+      // If it's not a valid ObjectId, only check publicId
+      updateQuery = {
+        $pull: {
+          images: { publicId: decodedImageId }
+        }
+      };
+    }
+
+    console.log('Update query:', JSON.stringify(updateQuery, null, 2));
+    const updatedGym = await Gym.findByIdAndUpdate(id, updateQuery, { new: true });
+
+    if (!updatedGym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Failed to update gym'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Image deleted successfully',
+      data: {
+        deletedImage: imageToDelete,
+        remainingImages: updatedGym.images.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting gym image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete gym image',
       error: error.message
     });
   }

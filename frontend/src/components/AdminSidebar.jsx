@@ -77,6 +77,11 @@ function AdminSidebar({ isOpen }) {
           { title: "Receptionists", path: "/admin/users/receptionists" },
         ],
       },
+      {
+        title: "Gym Registrations",
+        icon: MdOutlineSportsGymnastics,
+        path: "/admin/gym-registrations",
+      },
       // {
       //   title: "Classes",
       //   icon: FiCalendar,

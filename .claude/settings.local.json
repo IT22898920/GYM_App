@@ -13,7 +13,12 @@
       "Bash(cat:*)",
       "Bash(pkill:*)",
       "Bash(kill:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(npm run build:*)",
+      "Bash(npx:*)",
+      "Bash(/dev/null)",
+      "Bash(grep:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }

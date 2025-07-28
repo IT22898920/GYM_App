@@ -11,18 +11,21 @@ import {
   searchNearbyGyms,
   uploadImages,
   uploadGymLogo,
+  deleteGymImage,
   getGymStats,
   getGymDashboard
 } from '../controllers/gymController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect, authorize, optionalAuth } from '../middleware/auth.js';
 import { validateGymRegistration, validateGymUpdate } from '../middleware/validation.js';
 import { handleValidationErrors } from '../middleware/errorHandler.js';
 import { uploadGymImages, uploadGymImagesToCloudinary, uploadLogo, uploadGymLogoToCloudinary, handleUploadError } from '../middleware/upload.js';
 
 const router = express.Router();
 
+// Apply optional authentication to getAllGyms to check user role
+router.get('/', optionalAuth, getAllGyms);
+
 // Public routes
-router.get('/', getAllGyms);
 router.get('/search/nearby', searchNearbyGyms);
 router.get('/:id', getGymById);
 
@@ -36,6 +39,7 @@ router.get('/owner/dashboard', authorize('gymOwner', 'admin'), getGymDashboard);
 router.put('/:id', authorize('gymOwner', 'admin'), validateGymUpdate, handleValidationErrors, updateGym);
 router.post('/:id/upload-images', authorize('customer', 'gymOwner', 'admin'), uploadGymImages, uploadGymImagesToCloudinary, uploadImages);
 router.post('/:id/upload-logo', authorize('customer', 'gymOwner', 'admin'), uploadLogo, uploadGymLogoToCloudinary, uploadGymLogo);
+router.delete('/:id/images/:imageId', authorize('gymOwner', 'admin'), deleteGymImage);
 router.delete('/:id', authorize('gymOwner', 'admin'), deleteGym);
 
 // Admin only routes

@@ -88,6 +88,51 @@ export const authorize = (...roles) => {
   };
 };
 
+// Optional authentication - doesn't fail if no token, just sets req.user if valid
+export const optionalAuth = async (req, res, next) => {
+  try {
+    let token;
+
+    // Check for token in cookies first, then in Authorization header
+    if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      // No token provided, continue without user
+      req.user = null;
+      return next();
+    }
+
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      // Get user from token
+      const user = await User.findById(decoded.userId).select('-password');
+      
+      if (user && user.isActive) {
+        // Convert mongoose document to plain object and add id field
+        req.user = user.toObject();
+        req.user.id = req.user._id.toString();
+      } else {
+        req.user = null;
+      }
+    } catch (error) {
+      // Invalid token, continue without user
+      req.user = null;
+    }
+
+    next();
+  } catch (error) {
+    console.error('Optional auth middleware error:', error);
+    req.user = null;
+    next();
+  }
+};
+
 // Check if user owns the resource or is admin
 export const checkOwnership = (model) => {
   return async (req, res, next) => {

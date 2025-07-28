@@ -44,6 +44,10 @@ import AddInstructor from "./pages/gymowner/AddInstructor";
 import VerifyRejectInstructor from "./pages/gymowner/VerifyRejectInstructor";
 import ApplyToInstructor from "./pages/gymowner/ApplyToInstructor";
 import FinanceGym from "./pages/gymowner/Finance";
+import EditGymDetails from "./pages/gymowner/EditGymDetails";
+import ManageImages from "./pages/gymowner/ManageImages";
+import UpdateLocation from "./pages/gymowner/UpdateLocation";
+import ContactInfo from "./pages/gymowner/ContactInfo";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -71,6 +75,7 @@ import AddMemberForm from "./pages/gymowner/AddMemberForm";
 
 import FinanceAdmin from "./pages/admin/Finance";
 import CustomerRegisterGym from "./pages/CustomerRegisterGym";
+import GymRegistrations from "./pages/admin/GymRegistrations";
 
 
 function App() {
@@ -98,7 +103,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
+      {!isDashboardRoute && <Header />}
 
       <Routes>
         {/* Admin Routes */}
@@ -112,6 +117,7 @@ function AppContent() {
           <Route path="profile" element={<Profile />} />
           <Route path="payments" element={<Pricing />} />
           <Route path="finance" element={<FinanceAdmin />} />
+          <Route path="gym-registrations" element={<GymRegistrations />} />
 
           <Route
             path="instructor-applications"
@@ -136,6 +142,10 @@ function AppContent() {
           <Route path="apply-to-instructor" element={<ApplyToInstructor />} />
           <Route path="finance" element={<FinanceGym />} />
           <Route path="add-member" element={<AddMemberForm />} />
+          <Route path="edit-gym-details" element={<EditGymDetails />} />
+          <Route path="manage-images" element={<ManageImages />} />
+          <Route path="update-location" element={<UpdateLocation />} />
+          <Route path="contact-info" element={<ContactInfo />} />
 
           <Route
             path="verify-reject-instructor"

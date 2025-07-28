@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   FiArrowLeft, 
   FiUser, 
@@ -17,6 +18,8 @@ import {
 } from 'react-icons/fi';
 
 function ApplyInstructor() {
+  const { user } = useAuth();
+  
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -41,7 +44,15 @@ function ApplyInstructor() {
 
   useEffect(() => {
     setIsLoaded(true);
-  }, []);
+    
+    // Auto-populate email from logged-in user
+    if (user && user.email) {
+      setFormData(prev => ({
+        ...prev,
+        email: user.email
+      }));
+    }
+  }, [user]);
 
   const specializations = [
     'Strength Training',
@@ -163,28 +174,61 @@ function ApplyInstructor() {
     
     if (Object.keys(newErrors).length === 0) {
       setIsSubmitting(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      try {
+        // Create FormData for file uploads
+        const submitData = new FormData();
+        
+        // Add all text fields
+        Object.keys(formData).forEach(key => {
+          if (key === 'resume' || key === 'profilePicture') {
+            if (formData[key]) {
+              submitData.append(key, formData[key]);
+            }
+          } else if (key === 'certifications') {
+            if (formData[key].length > 0) {
+              Array.from(formData[key]).forEach((file, index) => {
+                submitData.append(`certifications`, file);
+              });
+            }
+          } else if (key === 'availability') {
+            submitData.append(key, JSON.stringify(formData[key]));
+          } else {
+            submitData.append(key, formData[key]);
+          }
+        });
+
+        // Submit to API (for now, we'll log it)
+        console.log('Instructor application submitted:', Object.fromEntries(submitData));
+        
+        // Show success message
+        alert('Application submitted successfully! We will review your application and get back to you soon.');
+        
+        // Reset form
+        setFormData({
+          firstName: '',
+          lastName: '',
+          email: user?.email || '',
+          phone: '',
+          specialization: '',
+          experience: '',
+          availability: [],
+          preferredLocation: '',
+          isFreelance: false,
+          motivation: '',
+          resume: null,
+          certifications: [],
+          profilePicture: null,
+          terms: false
+        });
+        setPreviewImage(null);
+        
+      } catch (error) {
+        console.error('Error submitting application:', error);
+        alert('Failed to submit application. Please try again.');
+      }
+      
       setIsSubmitting(false);
-      // Reset form
-      setFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        specialization: '',
-        experience: '',
-        availability: [],
-        preferredLocation: '',
-        isFreelance: false,
-        motivation: '',
-        resume: null,
-        certifications: [],
-        profilePicture: null,
-        terms: false
-      });
-      setPreviewImage(null);
-      console.log('Form submitted:', formData);
     } else {
       setErrors(newErrors);
     }
@@ -338,6 +382,7 @@ function ApplyInstructor() {
                           onChange={handleChange}
                           className="w-full bg-gray-900/50 text-white rounded-lg pl-12 pr-4 py-3 border border-gray-700/50 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none transition-all duration-300"
                           placeholder="john@example.com"
+                          readOnly={user && user.email ? true : false}
                         />
                         {errors.email && (
                           <p className="absolute -bottom-6 left-0 text-red-400 text-sm mt-1 flex items-center">

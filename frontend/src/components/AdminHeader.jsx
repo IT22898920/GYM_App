@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   FiBell,
   FiSearch,
@@ -18,6 +18,7 @@ import {
   FiBook,
   FiDollarSign,
   FiHeart,
+  FiClock,
 } from "react-icons/fi";
 
 function AdminHeader({ toggleSidebar, isSidebarOpen }) {
@@ -25,6 +26,22 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.profile-menu') && !event.target.closest('.profile-button')) {
+        setShowProfileMenu(false);
+      }
+      if (!event.target.closest('.notifications-menu') && !event.target.closest('.notifications-button')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Determine user role based on URL path
   const getRole = () => {
@@ -36,6 +53,25 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
   };
 
   const role = getRole();
+
+  // Handle logout
+  const handleLogout = () => {
+    // Clear any stored auth tokens
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    
+    // Navigate to appropriate login page
+    if (role === 'admin') {
+      navigate('/admin-login');
+    } else if (role === 'gym-owner') {
+      navigate('/gym-owner-login');
+    } else if (role === 'instructor') {
+      navigate('/instructor-login');
+    } else {
+      navigate('/login');
+    }
+  };
 
   // Role-specific data
   const roleData = {
@@ -233,7 +269,7 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700/50 relative"
+                className="notifications-button p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700/50 relative"
               >
                 <FiBell className="h-5 w-5" />
                 <span className="absolute -top-1 -right-1 h-2 w-2 bg-violet-500 rounded-full animate-pulse"></span>
@@ -241,7 +277,7 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
 
               {/* Notifications Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 z-50">
+                <div className="notifications-menu absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 z-50">
                   <div className="px-4 py-2 border-b border-gray-700">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-white">
@@ -300,7 +336,7 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
             <div className="relative">
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center space-x-3 focus:outline-none"
+                className="profile-button flex items-center space-x-3 focus:outline-none"
               >
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center transform hover:rotate-12 transition-all duration-300">
                   <FiUser className="h-5 w-5 text-white" />
@@ -327,7 +363,7 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
 
               {/* Profile Menu */}
               {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 z-50">
+                <div className="profile-menu absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 z-50">
                   <div className="px-4 py-2 border-b border-gray-700">
                     <p className="text-sm font-medium text-white">
                       Signed in as
@@ -353,7 +389,10 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
                     </Link>
                   </div>
                   <div className="border-t border-gray-700">
-                    <button className="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:bg-gray-700/50 transition-colors">
+                    <button 
+                      onClick={handleLogout}
+                      className="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:bg-gray-700/50 transition-colors"
+                    >
                       <FiLogOut className="h-4 w-4 mr-3" />
                       Sign out
                     </button>

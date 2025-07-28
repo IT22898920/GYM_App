@@ -114,7 +114,12 @@ export const validateGymRegistration = [
   body('contactInfo.website')
     .optional()
     .trim()
-    .isURL().withMessage('Please provide a valid website URL'),
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid website URL');
+      }
+      return true;
+    }),
   
   body('address.street')
     .trim()
@@ -247,7 +252,12 @@ export const validateGymUpdate = [
   body('contactInfo.website')
     .optional()
     .trim()
-    .isURL().withMessage('Please provide a valid website URL'),
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid website URL');
+      }
+      return true;
+    }),
   
   body('capacity')
     .optional()
@@ -260,5 +270,71 @@ export const validateGymUpdate = [
   
   body('pricing.dropInFee')
     .optional()
-    .isFloat({ min: 0 }).withMessage('Drop-in fee must be a non-negative number')
+    .isFloat({ min: 0 }).withMessage('Drop-in fee must be a non-negative number'),
+
+  // Social media validations
+  body('socialMedia.facebook')
+    .optional()
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid Facebook URL');
+      }
+      return true;
+    }),
+
+  body('socialMedia.instagram')
+    .optional()
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid Instagram URL');
+      }
+      return true;
+    }),
+
+  body('socialMedia.twitter')
+    .optional()
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid Twitter URL');
+      }
+      return true;
+    }),
+
+  body('socialMedia.youtube')
+    .optional()
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid YouTube URL');
+      }
+      return true;
+    }),
+
+  // Array validations
+  body('facilities')
+    .optional()
+    .isArray().withMessage('Facilities must be an array'),
+
+  body('services')
+    .optional()
+    .isArray().withMessage('Services must be an array'),
+
+  body('amenities')
+    .optional()
+    .isArray().withMessage('Amenities must be an array'),
+
+  body('specialPrograms')
+    .optional()
+    .isArray().withMessage('Special programs must be an array'),
+
+  body('tags')
+    .optional()
+    .isArray().withMessage('Tags must be an array'),
+
+  body('certifications')
+    .optional()
+    .isArray().withMessage('Certifications must be an array')
 ];

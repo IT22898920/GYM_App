@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Elements,
   CardElement,
@@ -6,8 +6,9 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { FiCreditCard, FiDollarSign, FiArrowLeft } from "react-icons/fi";
-import { Link } from "react-router-dom";
+import { FiCreditCard, FiDollarSign, FiArrowLeft, FiLoader } from "react-icons/fi";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const stripePromise = loadStripe("your_publishable_key");
 
@@ -87,7 +88,7 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-white">Payment Method</h2>
         <span className="text-2xl font-bold text-white">
-          ${selectedPlan.price}
+          Rs. {selectedPlan.price}
         </span>
       </div>
 
@@ -173,8 +174,13 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
   );
 }
 
-export default function CustomerRegisterGym({ onSuccess, onCancel }) {
+export default function CustomerRegisterGym() {
+  const { gymId } = useParams();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [gym, setGym] = useState(null);
+  const [gymLoading, setGymLoading] = useState(true);
+  const [gymError, setGymError] = useState(null);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -199,38 +205,81 @@ export default function CustomerRegisterGym({ onSuccess, onCancel }) {
 
   const [errors, setErrors] = useState({});
 
-  const plans = [
-    {
-      name: "Basic",
-      price: 29.99,
-      period: "/month",
-      features: [
-        "Access to gym equipment",
-        "Locker room access",
-        "Basic fitness assessment",
-      ],
-    },
-    {
-      name: "Premium",
-      price: 49.99,
-      period: "/month",
-      features: [
-        "All Basic features",
-        "2 Personal training sessions",
-        "Nutrition consultation",
-      ],
-    },
-    {
-      name: "Elite",
-      price: 99.99,
-      period: "/month",
-      features: [
-        "All Premium features",
-        "Unlimited training sessions",
-        "Priority booking",
-      ],
-    },
-  ];
+  // Fetch gym data
+  useEffect(() => {
+    const fetchGym = async () => {
+      if (!gymId) {
+        setGymError('No gym ID provided');
+        setGymLoading(false);
+        return;
+      }
+
+      try {
+        setGymLoading(true);
+        setGymError(null);
+        
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/gyms/${gymId}`);
+        
+        if (response.data.success) {
+          setGym(response.data.data);
+        } else {
+          setGymError('Failed to load gym information');
+        }
+      } catch (error) {
+        console.error('Error fetching gym:', error);
+        setGymError('Failed to load gym information. Please try again.');
+      } finally {
+        setGymLoading(false);
+      }
+    };
+
+    fetchGym();
+  }, [gymId]);
+
+  // Use gym's membership plans if available, otherwise use default plans
+  const plans = gym?.pricing?.membershipPlans && gym.pricing.membershipPlans.length > 0 
+    ? gym.pricing.membershipPlans.map(plan => ({
+        name: plan.name,
+        price: plan.price,
+        period: `/${plan.duration}`,
+        features: plan.benefits || [
+          "Access to gym equipment",
+          "Locker room access",
+          "Basic fitness assessment",
+        ],
+      }))
+    : [
+        {
+          name: "Basic",
+          price: 29.99,
+          period: "/month",
+          features: [
+            "Access to gym equipment",
+            "Locker room access",
+            "Basic fitness assessment",
+          ],
+        },
+        {
+          name: "Premium",
+          price: 49.99,
+          period: "/month",
+          features: [
+            "All Basic features",
+            "2 Personal training sessions",
+            "Nutrition consultation",
+          ],
+        },
+        {
+          name: "Elite",
+          price: 99.99,
+          period: "/month",
+          features: [
+            "All Premium features",
+            "Unlimited training sessions",
+            "Priority booking",
+          ],
+        },
+      ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -303,15 +352,69 @@ export default function CustomerRegisterGym({ onSuccess, onCancel }) {
   };
 
   const handlePaymentSuccess = (paymentDetails) => {
-    onSuccess({
+    // Handle successful registration
+    console.log('Registration successful:', {
       ...formData,
       paymentDetails,
+      gymId,
     });
+    
+    // You can add API call here to submit the registration
+    // For now, redirect to success page or gym page
+    navigate('/find-gym', { 
+      state: { 
+        message: 'Registration successful! Welcome to ' + (gym?.gymName || 'the gym') + '!' 
+      } 
+    });
+  };
+
+  const handleCancel = () => {
+    navigate('/find-gym');
   };
 
   const selectedPlan = plans.find(
     (p) => p.name.toLowerCase() === formData.plan
   );
+
+  // Show loading state while fetching gym data
+  if (gymLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 py-12 flex items-center justify-center">
+        <div className="text-center">
+          <FiLoader className="w-12 h-12 text-violet-500 animate-spin mx-auto mb-4" />
+          <p className="text-white text-lg">Loading gym information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if gym fetch failed
+  if (gymError) {
+    return (
+      <div className="min-h-screen bg-gray-900 py-12 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-red-400 mb-2">Error Loading Gym</h2>
+            <p className="text-red-300 mb-4">{gymError}</p>
+            <div className="space-x-4">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Try Again
+              </button>
+              <Link
+                to="/find-gym"
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Back to Gyms
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 py-12 relative">
@@ -331,6 +434,26 @@ export default function CustomerRegisterGym({ onSuccess, onCancel }) {
       </div>
 
       <div className="max-w-4xl mx-auto px-4">
+        {/* Gym Information Header */}
+        {gym && (
+          <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50 mb-8">
+            <div className="flex items-center space-x-4">
+              {gym.logo?.url && (
+                <img
+                  src={gym.logo.url}
+                  alt={`${gym.gymName} Logo`}
+                  className="h-16 w-16 object-contain rounded-lg"
+                />
+              )}
+              <div>
+                <h1 className="text-2xl font-bold text-white">{gym.gymName}</h1>
+                <p className="text-gray-400">{gym.address?.city}, {gym.address?.state}</p>
+                <p className="text-sm text-gray-500 mt-1">Join this amazing gym and start your fitness journey!</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-8">
           {[
             { name: "Personal Info", step: 1 },
@@ -543,7 +666,7 @@ export default function CustomerRegisterGym({ onSuccess, onCancel }) {
               <div className="flex justify-between pt-6">
                 <button
                   type="button"
-                  onClick={onCancel}
+                  onClick={handleCancel}
                   className="px-6 py-2 text-gray-400 hover:text-white transition-colors"
                 >
                   Cancel
@@ -730,7 +853,7 @@ export default function CustomerRegisterGym({ onSuccess, onCancel }) {
                     <div>
                       <div className="font-medium text-white">{plan.name}</div>
                       <div className="text-2xl font-bold text-white mt-2">
-                        ${plan.price}
+                        Rs. {plan.price}
                         <span className="text-sm font-normal text-gray-400">
                           {plan.period}
                         </span>
@@ -796,7 +919,7 @@ export default function CustomerRegisterGym({ onSuccess, onCancel }) {
             <Elements stripe={stripePromise}>
               <PaymentForm
                 onSuccess={handlePaymentSuccess}
-                onCancel={() => handleBack()}
+                onCancel={handleCancel}
                 selectedPlan={selectedPlan}
               />
             </Elements>
