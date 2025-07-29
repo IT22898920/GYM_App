@@ -460,3 +460,242 @@ export const getApplicationStats = async (req, res) => {
     });
   }
 };
+
+// Get all verified instructors (Admin only)
+export const getVerifiedInstructors = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      specialization,
+      search,
+      status = 'active'
+    } = req.query;
+
+    const filter = {
+      role: 'instructor',
+      isActive: status === 'active'
+    };
+
+    // Specialization filter
+    if (specialization && specialization !== 'all') {
+      filter.specialization = { $in: [specialization] };
+    }
+
+    // Search filter
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const instructors = await User.find(filter)
+      .select('-password -refreshToken -passwordResetToken -passwordResetExpires')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await User.countDocuments(filter);
+
+    // Get additional stats for each instructor
+    const instructorsWithStats = await Promise.all(
+      instructors.map(async (instructor) => {
+        // Get approved application data
+        const application = await InstructorApplication.findOne({
+          applicant: instructor._id,
+          status: 'approved'
+        });
+
+        return {
+          ...instructor.toObject(),
+          application: application ? {
+            approvedAt: application.approvedAt,
+            specialization: application.specialization,
+            experience: application.experience,
+            certifications: application.certifications,
+            profilePicture: application.profilePicture,
+            resume: application.resume,
+            motivation: application.motivation,
+            preferredLocation: application.preferredLocation,
+            availability: application.availability,
+            isFreelance: application.isFreelance
+          } : null,
+          // Add placeholder stats (you can expand this with real data)
+          stats: {
+            totalStudents: Math.floor(Math.random() * 200) + 20,
+            classesCompleted: Math.floor(Math.random() * 500) + 50,
+            rating: (Math.random() * 1.5 + 3.5).toFixed(1)
+          }
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: instructorsWithStats,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching verified instructors:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch verified instructors',
+      error: error.message
+    });
+  }
+};
+
+// Deactivate/Activate instructor (Admin only)
+export const toggleInstructorStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const instructor = await User.findById(id);
+    if (!instructor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor not found'
+      });
+    }
+
+    if (instructor.role !== 'instructor') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not an instructor'
+      });
+    }
+
+    instructor.isActive = isActive;
+    await instructor.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Instructor ${isActive ? 'activated' : 'deactivated'} successfully`,
+      data: instructor
+    });
+
+  } catch (error) {
+    console.error('Error toggling instructor status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update instructor status',
+      error: error.message
+    });
+  }
+};
+
+// Get instructor details by ID (Admin only)
+export const getInstructorById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const instructor = await User.findById(id)
+      .select('-password -refreshToken -passwordResetToken -passwordResetExpires');
+
+    if (!instructor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor not found'
+      });
+    }
+
+    if (instructor.role !== 'instructor') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not an instructor'
+      });
+    }
+
+    // Get approved application data
+    const application = await InstructorApplication.findOne({
+      applicant: instructor._id,
+      status: 'approved'
+    });
+
+    const instructorWithDetails = {
+      ...instructor.toObject(),
+      application: application ? {
+        approvedAt: application.approvedAt,
+        specialization: application.specialization,
+        experience: application.experience,
+        certifications: application.certifications,
+        profilePicture: application.profilePicture,
+        motivation: application.motivation,
+        preferredLocation: application.preferredLocation,
+        availability: application.availability,
+        resume: application.resume,
+        isFreelance: application.isFreelance
+      } : null
+    };
+
+    res.status(200).json({
+      success: true,
+      data: instructorWithDetails
+    });
+
+  } catch (error) {
+    console.error('Error fetching instructor details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch instructor details',
+      error: error.message
+    });
+  }
+};
+
+// Get freelance instructors for gym owners to apply to
+export const getFreelanceInstructors = async (req, res) => {
+  try {
+    // Find approved instructor applications where isFreelance is true
+    const freelanceInstructors = await InstructorApplication.find({
+      status: 'approved',
+      isFreelance: true
+    })
+    .populate('applicant', 'firstName lastName email phone')
+    .select('specialization experience preferredLocation availability profilePicture certifications resume isFreelance motivation')
+    .sort({ createdAt: -1 });
+
+    const instructorsWithDetails = freelanceInstructors.map(application => ({
+      _id: application.applicant._id,
+      firstName: application.applicant.firstName,
+      lastName: application.applicant.lastName,
+      email: application.applicant.email,
+      phone: application.applicant.phone,
+      applicationDetails: {
+        specialization: application.specialization,
+        experience: application.experience,
+        preferredLocation: application.preferredLocation,
+        availability: application.availability,
+        profilePicture: application.profilePicture,
+        certifications: application.certifications,
+        resume: application.resume,
+        isFreelance: application.isFreelance,
+        motivation: application.motivation
+      }
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: instructorsWithDetails
+    });
+
+  } catch (error) {
+    console.error('Error fetching freelance instructors:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch freelance instructors',
+      error: error.message
+    });
+  }
+};

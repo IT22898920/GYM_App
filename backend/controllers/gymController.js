@@ -1,5 +1,6 @@
 import Gym from '../models/Gym.js';
 import User from '../models/User.js';
+import InstructorApplication from '../models/InstructorApplication.js';
 import { sendGymApprovalEmail, sendGymRejectionEmail, sendGymPendingEmail } from '../utils/emailService.js';
 import { deleteFromCloudinary } from '../config/cloudinary.js';
 
@@ -689,6 +690,371 @@ export const searchNearbyGyms = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to search nearby gyms',
+      error: error.message
+    });
+  }
+};
+
+// Add instructor to gym
+export const addInstructorToGym = async (req, res) => {
+  try {
+    const { gymId } = req.params;
+    const { instructorId, specialization, schedule } = req.body;
+
+    // Find the gym
+    const gym = await Gym.findById(gymId);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to add instructors to this gym'
+      });
+    }
+
+    // Verify the instructor exists and is active
+    const instructor = await User.findById(instructorId);
+    if (!instructor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor not found'
+      });
+    }
+
+    if (instructor.role !== 'instructor') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not a verified instructor'
+      });
+    }
+
+    if (!instructor.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Instructor is not active'
+      });
+    }
+
+    // Check if instructor is already added to this gym
+    const existingInstructor = gym.instructors.find(
+      inst => inst.instructor.toString() === instructorId
+    );
+
+    if (existingInstructor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Instructor is already added to this gym'
+      });
+    }
+
+    // Add instructor to gym
+    gym.instructors.push({
+      instructor: instructorId,
+      specialization: specialization || 'General Fitness',
+      schedule: schedule || [],
+      isActive: true
+    });
+
+    await gym.save();
+
+    // Populate the new instructor data
+    const updatedGym = await Gym.findById(gymId)
+      .populate('instructors.instructor', 'firstName lastName email specialization');
+
+    res.status(200).json({
+      success: true,
+      message: 'Instructor added successfully',
+      data: updatedGym.instructors[updatedGym.instructors.length - 1]
+    });
+
+  } catch (error) {
+    console.error('Error adding instructor to gym:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add instructor to gym',
+      error: error.message
+    });
+  }
+};
+
+// Remove instructor from gym
+export const removeInstructorFromGym = async (req, res) => {
+  try {
+    const { gymId, instructorId } = req.params;
+
+    const gym = await Gym.findById(gymId);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to remove instructors from this gym'
+      });
+    }
+
+    // Remove instructor from gym
+    const initialLength = gym.instructors.length;
+    gym.instructors = gym.instructors.filter(
+      inst => inst.instructor.toString() !== instructorId
+    );
+
+    if (gym.instructors.length === initialLength) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor not found in this gym'
+      });
+    }
+
+    await gym.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Instructor removed successfully'
+    });
+
+  } catch (error) {
+    console.error('Error removing instructor from gym:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove instructor from gym',
+      error: error.message
+    });
+  }
+};
+
+// Get gym instructors
+export const getGymInstructors = async (req, res) => {
+  try {
+    const { gymId } = req.params;
+
+    const gym = await Gym.findById(gymId)
+      .populate({
+        path: 'instructors.instructor',
+        select: 'firstName lastName email phone specialization experience isActive'
+      });
+
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: gym.instructors
+    });
+
+  } catch (error) {
+    console.error('Error fetching gym instructors:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch gym instructors',
+      error: error.message
+    });
+  }
+};
+
+// Search available instructors (not in current gym)
+export const searchAvailableInstructors = async (req, res) => {
+  try {
+    const { gymId } = req.params;
+    const { search, specialization, page = 1, limit = 10 } = req.query;
+
+    // Get current gym to exclude its instructors
+    const gym = await Gym.findById(gymId);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Get instructor IDs already in this gym
+    const gymInstructorIds = gym.instructors.map(inst => inst.instructor.toString());
+
+    // Build search filter
+    const filter = {
+      role: 'instructor',
+      isActive: true,
+      _id: { $nin: gymInstructorIds } // Exclude instructors already in gym
+    };
+
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (specialization) {
+      filter.specialization = { $in: [specialization] };
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const instructors = await User.find(filter)
+      .select('firstName lastName email phone specialization experience createdAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await User.countDocuments(filter);
+
+    // Get application data for each instructor
+    const instructorsWithDetails = await Promise.all(
+      instructors.map(async (instructor) => {
+        const application = await InstructorApplication.findOne({
+          applicant: instructor._id,
+          status: 'approved'
+        }).select('specialization experience profilePicture isFreelance preferredLocation');
+
+        return {
+          ...instructor.toObject(),
+          applicationDetails: application
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: instructorsWithDetails,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error searching available instructors:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search instructors',
+      error: error.message
+    });
+  }
+};
+
+// Register new instructor directly for a gym
+export const registerGymInstructor = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      specialization,
+      experience,
+      salary,
+      startDate,
+      description,
+      password,
+      gymId
+    } = req.body;
+
+    // Check if user is gym owner or admin
+    if (req.user.role !== 'gymOwner' && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only gym owners can register instructors'
+      });
+    }
+
+    // Verify the gym exists and user owns it
+    const gym = await Gym.findById(gymId);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to register instructors for this gym'
+      });
+    }
+
+    // Check if user with this email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'A user with this email already exists'
+      });
+    }
+
+    // Create new instructor user
+    const newInstructor = new User({
+      firstName,
+      lastName,
+      email,
+      phone,
+      password, // Will be hashed by pre-save middleware
+      role: 'instructor',
+      specialization: [specialization],
+      experience: parseInt(experience),
+      isActive: true
+    });
+
+    await newInstructor.save();
+
+    // Prepare instructor data for gym
+    const instructorGymData = {
+      instructor: newInstructor._id,
+      specialization,
+      salary: parseFloat(salary),
+      startDate: new Date(startDate),
+      description: description || '',
+      isActive: true
+    };
+
+    // Add uploaded files if they exist
+    if (req.uploadedFiles) {
+      if (req.uploadedFiles.resume) {
+        instructorGymData.resume = req.uploadedFiles.resume;
+      }
+      if (req.uploadedFiles.certifications) {
+        instructorGymData.certifications = req.uploadedFiles.certifications;
+      }
+    }
+
+    // Add instructor to gym's instructors array
+    gym.instructors.push(instructorGymData);
+
+    await gym.save();
+
+    // Return instructor info (without password)
+    const instructorResponse = await User.findById(newInstructor._id)
+      .select('-password -refreshToken -passwordResetToken -passwordResetExpires');
+
+    res.status(201).json({
+      success: true,
+      message: 'Instructor registered successfully',
+      data: instructorResponse
+    });
+
+  } catch (error) {
+    console.error('Error registering gym instructor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to register instructor',
       error: error.message
     });
   }

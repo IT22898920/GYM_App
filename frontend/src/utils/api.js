@@ -210,6 +210,176 @@ class ApiService {
     
     return this.handleResponse(response);
   }
+
+  // Verified Instructors endpoints
+  async getVerifiedInstructors(params = {}) {
+    const queryParams = new URLSearchParams(params);
+    const response = await fetch(`${this.baseURL}/instructors/admin/verified?${queryParams}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getInstructorDetailsById(id) {
+    const response = await fetch(`${this.baseURL}/instructors/admin/instructor/${id}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async toggleInstructorStatus(id, isActive) {
+    const response = await fetch(`${this.baseURL}/instructors/admin/instructor/${id}/toggle-status`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ isActive })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // Gym Instructor Management endpoints
+  async getGymInstructors(gymId) {
+    const response = await fetch(`${this.baseURL}/gyms/${gymId}/instructors`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async searchAvailableInstructors(gymId, params = {}) {
+    const queryParams = new URLSearchParams(params);
+    const response = await fetch(`${this.baseURL}/gyms/${gymId}/instructors/search?${queryParams}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async addInstructorToGym(gymId, instructorData) {
+    const response = await fetch(`${this.baseURL}/gyms/${gymId}/instructors`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(instructorData)
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async removeInstructorFromGym(gymId, instructorId) {
+    const response = await fetch(`${this.baseURL}/gyms/${gymId}/instructors/${instructorId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getGymsByOwner() {
+    const response = await fetch(`${this.baseURL}/gyms/owner/gyms`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getFreelanceInstructors() {
+    const response = await fetch(`${this.baseURL}/instructors/freelance`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async registerGymInstructor(instructorData) {
+    // Check if instructorData is FormData (for file uploads)
+    const isFormData = instructorData instanceof FormData;
+    
+    const response = await fetch(`${this.baseURL}/gyms/register-instructor`, {
+      method: 'POST',
+      headers: this.getHeaders(isFormData),
+      credentials: 'include',
+      body: isFormData ? instructorData : JSON.stringify(instructorData)
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // Collaboration Request endpoints
+  async sendCollaborationRequest(instructorId, message, gymId) {
+    const response = await fetch(`${this.baseURL}/collaborations/send`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ instructorId, message, gymId })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getGymOwnerCollaborationRequests(status = null, gymId = null) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (gymId) params.append('gymId', gymId);
+    
+    const response = await fetch(`${this.baseURL}/collaborations/gym-owner?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getInstructorCollaborationRequests(status = null) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    
+    const response = await fetch(`${this.baseURL}/collaborations/instructor?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async respondToCollaborationRequest(requestId, action, responseMessage = '') {
+    const response = await fetch(`${this.baseURL}/collaborations/${requestId}/respond`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ action, responseMessage })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async cancelCollaborationRequest(requestId) {
+    const response = await fetch(`${this.baseURL}/collaborations/${requestId}/cancel`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
 }
 
 // Create and export a single instance

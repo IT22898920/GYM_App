@@ -226,6 +226,49 @@ const gymSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
+  instructors: [{
+    instructor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    addedAt: {
+      type: Date,
+      default: Date.now
+    },
+    specialization: String,
+    salary: {
+      type: Number,
+      min: 0
+    },
+    startDate: {
+      type: Date
+    },
+    description: String,
+    resume: {
+      url: String,
+      publicId: String,
+      originalName: String,
+      size: Number,
+      format: String
+    },
+    certifications: [{
+      url: String,
+      publicId: String,
+      originalName: String,
+      size: Number,
+      format: String
+    }],
+    schedule: [{
+      day: String,
+      startTime: String,
+      endTime: String,
+      className: String
+    }],
+    isActive: {
+      type: Boolean,
+      default: true
+    }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

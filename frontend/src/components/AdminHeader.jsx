@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import api from '../utils/api';
 import {
   FiBell,
   FiSearch,
@@ -25,8 +26,33 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Fetch current user data
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        // First try to get user from localStorage
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          setCurrentUser(JSON.parse(storedUser));
+        } else {
+          // If not in localStorage, fetch from API
+          const response = await api.getCurrentUser();
+          if (response.success) {
+            setCurrentUser(response.data);
+            localStorage.setItem('user', JSON.stringify(response.data));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -56,10 +82,11 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
 
   // Handle logout
   const handleLogout = () => {
-    // Clear any stored auth tokens
+    // Clear any stored auth tokens and user data
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    setCurrentUser(null);
     
     // Navigate to appropriate login page
     if (role === 'admin') {
@@ -73,11 +100,12 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
     }
   };
 
-  // Role-specific data
+  // Role-specific data with current user information
   const roleData = {
     admin: {
       title: "Admin Dashboard",
-      email: "admin@fitconnect.com",
+      email: currentUser?.email || "admin@fitconnect.com",
+      name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Admin User",
       icon: FiShield,
       notifications: [
         {
@@ -100,7 +128,8 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
     },
     "gym-owner": {
       title: "Gym Dashboard",
-      email: "owner@fitzone.com",
+      email: currentUser?.email || "owner@fitzone.com",
+      name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Gym Owner",
       icon: FiActivity,
       notifications: [
         {
@@ -123,7 +152,8 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
     },
     instructor: {
       title: "Instructor Dashboard",
-      email: "instructor@fitzone.com",
+      email: currentUser?.email || "instructor@fitzone.com",
+      name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Instructor",
       icon: FiBook,
       notifications: [
         {
@@ -146,7 +176,8 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
     },
     customer: {
       title: "Member Dashboard",
-      email: "member@fitconnect.com",
+      email: currentUser?.email || "member@fitconnect.com",
+      name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Member",
       icon: FiHeart,
       notifications: [
         {
@@ -343,12 +374,7 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
                 </div>
                 <div className="hidden md:block text-left">
                   <div className="text-sm font-medium text-white">
-                    {role
-                      .split("-")
-                      .map(
-                        (word) => word.charAt(0).toUpperCase() + word.slice(1)
-                      )
-                      .join(" ")}
+                    {roleData[role].name}
                   </div>
                   <div className="text-xs text-gray-400">
                     {roleData[role].email}

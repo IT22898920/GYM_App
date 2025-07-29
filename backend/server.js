@@ -6,6 +6,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import gymRoutes from './routes/gymRoutes.js';
 import instructorRoutes from './routes/instructorRoutes.js';
+import collaborationRoutes from './routes/collaborationRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -52,6 +53,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/auth', authRoutes);
 app.use('/api/gyms', gymRoutes);
 app.use('/api/instructors', instructorRoutes);
+app.use('/api/collaborations', collaborationRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

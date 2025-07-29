@@ -65,10 +65,11 @@ export const protect = async (req, res, next) => {
 export const authorize = (...roles) => {
   return (req, res, next) => {
     // Debug logging
-    console.log('Authorization check:', {
+    console.log('🛡️ AUTHORIZATION CHECK:', {
       userRole: req.user?.role,
       allowedRoles: roles,
-      userId: req.user?.id
+      userId: req.user?.id,
+      path: req.path
     });
     
     if (!req.user) {
