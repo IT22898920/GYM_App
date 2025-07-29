@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 import { 
   FiMenu, 
   FiX, 
@@ -240,14 +241,21 @@ function Header() {
             <button className="text-gray-400 hover:text-white transition-all duration-300 hover:scale-110">
               <FiSearch className="h-5 w-5 hover:rotate-12" />
             </button>
-            <button className="text-gray-400 hover:text-white transition-all duration-300 hover:scale-110 relative">
-              <FiBell className="h-5 w-5 hover:rotate-12" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-gray-700 rounded-full text-white text-xs flex items-center justify-center animate-ping">
-                <span className="absolute h-4 w-4 bg-gray-700 rounded-full animate-pulse">
-                  2
+            
+            {/* Use NotificationBell component for authenticated users */}
+            {isAuthenticated ? (
+              <NotificationBell />
+            ) : (
+              <button className="text-gray-400 hover:text-white transition-all duration-300 hover:scale-110 relative">
+                <FiBell className="h-5 w-5 hover:rotate-12" />
+                <span className="absolute -top-1 -right-1 h-4 w-4 bg-gray-700 rounded-full text-white text-xs flex items-center justify-center animate-ping">
+                  <span className="absolute h-4 w-4 bg-gray-700 rounded-full animate-pulse">
+                    2
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
+            )}
+            
             <button className="text-gray-400 hover:text-white transition-all duration-300 hover:scale-110 relative">
               <FiShoppingBag className="h-5 w-5 hover:rotate-12" />
               <span className="absolute -top-1 -right-1 h-4 w-4 bg-gray-800 rounded-full text-white text-xs flex items-center justify-center">
@@ -282,14 +290,19 @@ function Header() {
               </span>
             </Link>
             <div className="flex items-center space-x-4">
-              <button className="text-gray-400 hover:text-white transition-all duration-300 hover:scale-110 relative">
-                <FiBell className="h-5 w-5 hover:rotate-12" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-gray-700 rounded-full text-white text-xs flex items-center justify-center animate-ping">
-                  <span className="absolute h-4 w-4 bg-gray-700 rounded-full animate-pulse">
-                    2
+              {/* Use NotificationBell component for authenticated users in mobile */}
+              {isAuthenticated ? (
+                <NotificationBell />
+              ) : (
+                <button className="text-gray-400 hover:text-white transition-all duration-300 hover:scale-110 relative">
+                  <FiBell className="h-5 w-5 hover:rotate-12" />
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-gray-700 rounded-full text-white text-xs flex items-center justify-center animate-ping">
+                    <span className="absolute h-4 w-4 bg-gray-700 rounded-full animate-pulse">
+                      2
+                    </span>
                   </span>
-                </span>
-              </button>
+                </button>
+              )}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="text-gray-400 hover:text-white transition-all duration-300 hover:scale-110"

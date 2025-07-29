@@ -7,6 +7,8 @@ import authRoutes from './routes/authRoutes.js';
 import gymRoutes from './routes/gymRoutes.js';
 import instructorRoutes from './routes/instructorRoutes.js';
 import collaborationRoutes from './routes/collaborationRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import gymRequestRoutes from './routes/gymRequestRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -54,6 +56,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/gyms', gymRoutes);
 app.use('/api/instructors', instructorRoutes);
 app.use('/api/collaborations', collaborationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/gym-requests', gymRequestRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

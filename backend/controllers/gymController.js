@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import InstructorApplication from '../models/InstructorApplication.js';
 import { sendGymApprovalEmail, sendGymRejectionEmail, sendGymPendingEmail } from '../utils/emailService.js';
 import { deleteFromCloudinary } from '../config/cloudinary.js';
+import NotificationService from '../services/notificationService.js';
 
 // Upload gym logo
 export const uploadGymLogo = async (req, res) => {
@@ -226,6 +227,50 @@ export const registerGym = async (req, res) => {
     } catch (emailError) {
       console.error('Error sending confirmation email:', emailError);
       // Don't fail the registration if email fails
+    }
+
+    // Send registration confirmation notification to gym owner
+    try {
+      await NotificationService.createNotification({
+        recipient: req.user.id,
+        type: 'gym_registration_submitted',
+        title: 'Gym Registration Submitted 📋',
+        message: `Your gym "${gymName}" has been successfully registered and is now pending admin approval. We will notify you once it's reviewed.`,
+        data: { 
+          gymId: savedGym._id,
+          gymName: gymName,
+          status: 'pending'
+        },
+        link: '/gym-owner/dashboard',
+        priority: 'medium'
+      });
+      console.log('✅ Gym registration notification sent to owner:', owner.email);
+    } catch (notificationError) {
+      console.error('❌ Error sending gym registration notification:', notificationError);
+    }
+
+    // Send notification to all admins about new gym registration
+    try {
+      const adminUsers = await User.find({ role: 'admin', isActive: true }).select('_id');
+      if (adminUsers.length > 0) {
+        await NotificationService.createBulkNotifications({
+          recipients: adminUsers.map(admin => admin._id),
+          type: 'new_gym_registration',
+          title: 'New Gym Registration Pending 🏢',
+          message: `New gym "${gymName}" registered by ${owner.firstName} ${owner.lastName}. Review required for approval.`,
+          data: { 
+            gymId: savedGym._id,
+            gymName: gymName,
+            ownerName: `${owner.firstName} ${owner.lastName}`,
+            ownerEmail: owner.email
+          },
+          link: '/admin/gym-registrations',
+          priority: 'high'
+        });
+        console.log('✅ New gym registration notifications sent to', adminUsers.length, 'admins');
+      }
+    } catch (notificationError) {
+      console.error('❌ Error sending admin notifications:', notificationError);
     }
 
     res.status(201).json({
@@ -516,6 +561,11 @@ export const getGymsByOwner = async (req, res) => {
 // Admin: Approve gym
 export const approveGym = async (req, res) => {
   try {
+    console.log('🏢 APPROVE GYM FUNCTION CALLED');
+    console.log('🏢 Gym ID:', req.params.id);
+    console.log('🏢 Admin Notes:', req.body.adminNotes);
+    console.log('🏢 Admin User:', req.user.id, req.user.role);
+    
     const { id } = req.params;
     const { adminNotes } = req.body;
 
@@ -564,6 +614,48 @@ export const approveGym = async (req, res) => {
     } catch (emailError) {
       console.error('Error sending approval email:', emailError);
       // Don't fail the approval if email fails
+    }
+
+    // Send approval notification to gym owner
+    try {
+      await NotificationService.createNotification({
+        recipient: gym.owner._id,
+        type: 'gym_registration_approved',
+        title: 'Gym Registration Approved! 🎉',
+        message: `Congratulations! Your gym "${gym.gymName}" has been approved and is now live on our platform. You can start managing your gym and accepting members.`,
+        data: { 
+          gymId: gym._id,
+          gymName: gym.gymName,
+          adminNotes: adminNotes
+        },
+        link: '/gym-owner/dashboard',
+        priority: 'high'
+      });
+      console.log('✅ Gym approval notification sent to:', gym.owner.email);
+    } catch (notificationError) {
+      console.error('❌ Error sending gym approval notification:', notificationError);
+    }
+
+    // Send confirmation notification to admin
+    try {
+      await NotificationService.createNotification({
+        recipient: req.user.id,
+        type: 'admin_action_completed',
+        title: 'Gym Approved Successfully ✅',
+        message: `You have successfully approved "${gym.gymName}" owned by ${gym.owner.firstName} ${gym.owner.lastName}. The gym is now active on the platform.`,
+        data: { 
+          actionType: 'gym_approval',
+          gymId: gym._id,
+          gymName: gym.gymName,
+          ownerName: `${gym.owner.firstName} ${gym.owner.lastName}`,
+          ownerEmail: gym.owner.email
+        },
+        link: '/admin/gym-registrations',
+        priority: 'medium'
+      });
+      console.log('✅ Admin confirmation notification sent for gym approval');
+    } catch (notificationError) {
+      console.error('❌ Error sending admin confirmation notification:', notificationError);
     }
 
     res.status(200).json({
@@ -624,6 +716,50 @@ export const rejectGym = async (req, res) => {
     } catch (emailError) {
       console.error('Error sending rejection email:', emailError);
       // Don't fail the rejection if email fails
+    }
+
+    // Send rejection notification to gym owner
+    try {
+      await NotificationService.createNotification({
+        recipient: gym.owner._id,
+        type: 'gym_registration_rejected',
+        title: 'Gym Registration Update',
+        message: `Unfortunately, your gym registration for "${gym.gymName}" has been rejected. ${adminNotes ? `Reason: ${adminNotes}` : ''} You can contact support for more information or resubmit with the required changes.`,
+        data: { 
+          gymId: gym._id,
+          gymName: gym.gymName,
+          adminNotes: adminNotes,
+          rejectionReason: adminNotes
+        },
+        link: '/register-gym',
+        priority: 'high'
+      });
+      console.log('✅ Gym rejection notification sent to:', gym.owner.email);
+    } catch (notificationError) {
+      console.error('❌ Error sending gym rejection notification:', notificationError);
+    }
+
+    // Send confirmation notification to admin
+    try {
+      await NotificationService.createNotification({
+        recipient: req.user.id,
+        type: 'admin_action_completed',
+        title: 'Gym Rejected ❌',
+        message: `You have rejected the gym registration for "${gym.gymName}" by ${gym.owner.firstName} ${gym.owner.lastName}. ${adminNotes ? `Reason: ${adminNotes}` : ''}`,
+        data: { 
+          actionType: 'gym_rejection',
+          gymId: gym._id,
+          gymName: gym.gymName,
+          ownerName: `${gym.owner.firstName} ${gym.owner.lastName}`,
+          ownerEmail: gym.owner.email,
+          rejectionReason: adminNotes
+        },
+        link: '/admin/gym-registrations',
+        priority: 'medium'
+      });
+      console.log('✅ Admin confirmation notification sent for gym rejection');
+    } catch (notificationError) {
+      console.error('❌ Error sending admin confirmation notification:', notificationError);
     }
 
     res.status(200).json({
@@ -883,7 +1019,9 @@ export const searchAvailableInstructors = async (req, res) => {
     }
 
     // Get instructor IDs already in this gym
-    const gymInstructorIds = gym.instructors.map(inst => inst.instructor.toString());
+    const gymInstructorIds = gym.instructors
+      .filter(inst => inst && inst.instructor) // Filter out null/undefined entries
+      .map(inst => inst.instructor.toString());
 
     // Build search filter
     const filter = {
@@ -1040,6 +1178,52 @@ export const registerGymInstructor = async (req, res) => {
 
     await gym.save();
 
+    // Send welcome notification to new instructor
+    try {
+      await NotificationService.createNotification({
+        recipient: newInstructor._id,
+        sender: req.user.id,
+        type: 'instructor_added_to_gym',
+        title: 'Welcome to the Team! 🎉',
+        message: `You have been registered as an instructor at ${gym.gymName}. Welcome aboard! Your login credentials have been set up and you can start managing your classes.`,
+        data: { 
+          gymId: gym._id,
+          gymName: gym.gymName,
+          position: specialization,
+          salary: salary,
+          startDate: startDate
+        },
+        link: '/instructor/dashboard',
+        priority: 'high'
+      });
+      console.log('✅ Welcome notification sent to new instructor:', email);
+    } catch (notificationError) {
+      console.error('❌ Error sending instructor welcome notification:', notificationError);
+    }
+
+    // Send confirmation notification to gym owner
+    try {
+      await NotificationService.createNotification({
+        recipient: req.user.id,
+        type: 'instructor_registration_completed',
+        title: 'Instructor Registered Successfully ✅',
+        message: `${firstName} ${lastName} has been successfully registered as a ${specialization} instructor for ${gym.gymName}. They can now access their instructor dashboard.`,
+        data: { 
+          instructorId: newInstructor._id,
+          instructorName: `${firstName} ${lastName}`,
+          instructorEmail: email,
+          gymId: gym._id,
+          gymName: gym.gymName,
+          specialization: specialization
+        },
+        link: '/gym-owner/instructors',
+        priority: 'medium'
+      });
+      console.log('✅ Instructor registration confirmation sent to gym owner');
+    } catch (notificationError) {
+      console.error('❌ Error sending gym owner confirmation notification:', notificationError);
+    }
+
     // Return instructor info (without password)
     const instructorResponse = await User.findById(newInstructor._id)
       .select('-password -refreshToken -passwordResetToken -passwordResetExpires');
@@ -1055,6 +1239,78 @@ export const registerGymInstructor = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to register instructor',
+      error: error.message
+    });
+  }
+};
+
+// Update gym instructor details
+export const updateGymInstructor = async (req, res) => {
+  try {
+    const { gymId, instructorId } = req.params;
+    const { specialization, salary, startDate, description, isActive, schedule } = req.body;
+
+    // Verify gym ownership
+    const gym = await Gym.findById(gymId);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    if (gym.owner.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to update instructors for this gym'
+      });
+    }
+
+    // Find the instructor in the gym's instructors array
+    const instructorIndex = gym.instructors.findIndex(
+      inst => inst._id.toString() === instructorId
+    );
+
+    if (instructorIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor not found in this gym'
+      });
+    }
+
+    // Update instructor details
+    if (specialization !== undefined) gym.instructors[instructorIndex].specialization = specialization;
+    if (salary !== undefined) gym.instructors[instructorIndex].salary = salary;
+    if (startDate !== undefined) gym.instructors[instructorIndex].startDate = startDate;
+    if (description !== undefined) gym.instructors[instructorIndex].description = description;
+    if (isActive !== undefined) gym.instructors[instructorIndex].isActive = isActive;
+    if (schedule !== undefined) gym.instructors[instructorIndex].schedule = schedule;
+
+    // Save the updated gym
+    await gym.save();
+
+    // Get the updated instructor with populated data
+    const updatedGym = await Gym.findById(gymId)
+      .populate({
+        path: 'instructors.instructor',
+        select: 'firstName lastName email phone specialization experience isActive'
+      });
+
+    const updatedInstructor = updatedGym.instructors.find(
+      inst => inst._id.toString() === instructorId
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Instructor updated successfully',
+      data: updatedInstructor
+    });
+
+  } catch (error) {
+    console.error('Error updating gym instructor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update instructor',
       error: error.message
     });
   }

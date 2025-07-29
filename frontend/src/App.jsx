@@ -41,7 +41,9 @@ import GymOwnerClasses from "./pages/gymowner/Classes";
 import GymOwnerMembers from "./pages/gymowner/Members";
 import GymOwnerSettings from "./pages/gymowner/Settings";
 import AddInstructor from "./pages/gymowner/AddInstructor";
+import EditInstructor from "./pages/gymowner/EditInstructor";
 import VerifyRejectInstructor from "./pages/gymowner/VerifyRejectInstructor";
+import VerifyRejectGymOwner from "./pages/gymowner/VerifyRejectGym";
 import ApplyToInstructor from "./pages/gymowner/ApplyToInstructor";
 import FinanceGym from "./pages/gymowner/Finance";
 import EditGymDetails from "./pages/gymowner/EditGymDetails";
@@ -67,6 +69,7 @@ import Privacy from "./pages/Privacy";
 import Pricing from "./pages/admin/Pricing";
 import ViewProgress from "./pages/instructor/ViewProgress";
 import ApplyToGym from "./pages/instructor/ApplyToGym";
+import GymRequests from "./pages/instructor/GymRequests";
 import Finance from "./pages/admin/Finance";
 import VerifyRejectGym from "./pages/instructor/VerifyRejectGym";
 import FreelanceStudents from "./pages/instructor/Student/FreelanceStudents";
@@ -95,10 +98,9 @@ function AppContent() {
   const isAdminRoute = location.pathname.startsWith("/admin");
   const isGymOwnerRoute = location.pathname.startsWith("/gym-owner");
   const isInstructorRoute = location.pathname.startsWith("/instructor");
-  const isCustomerRoute = location.pathname.startsWith("/customer");
 
     const isDashboardRoute =
-      isAdminRoute || isGymOwnerRoute || isInstructorRoute || isCustomerRoute;
+      isAdminRoute || isGymOwnerRoute || isInstructorRoute;
 
 
   return (
@@ -134,6 +136,7 @@ function AppContent() {
         <Route path="/gym-owner" element={<GymOwnerLayout />}>
           <Route index element={<GymOwnerDashboard />} />
           <Route path="instructors" element={<GymOwnerInstructors />} />
+          <Route path="instructors/:instructorId/edit" element={<EditInstructor />} />
           <Route path="classes" element={<GymOwnerClasses />} />
           <Route path="members" element={<GymOwnerMembers />} />
           <Route path="settings" element={<GymOwnerSettings />} />
@@ -150,6 +153,10 @@ function AppContent() {
           <Route
             path="verify-reject-instructor"
             element={<VerifyRejectInstructor />}
+          />
+          <Route
+            path="verify-reject-gym"
+            element={<VerifyRejectGymOwner />}
           />
         </Route>
 
@@ -172,6 +179,7 @@ function AppContent() {
           <Route path="workout-plans" element={<WorkoutPlans />} />
           <Route path="workout-plans/create" element={<CreateWorkoutPlan />} />
           <Route path="apply-to-gym" element={<ApplyToGym />} />
+          <Route path="gym-requests" element={<GymRequests />} />
           <Route path="verify-reject-gym" element={<VerifyRejectGym />} />
         </Route>
 

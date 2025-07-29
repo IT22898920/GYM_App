@@ -28,6 +28,9 @@ class ApiService {
     const token = localStorage.getItem('token');
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+      console.log('🔑 Token found for API call:', token.substring(0, 20) + '...');
+    } else {
+      console.log('❌ No token found in localStorage');
     }
     
     return headers;
@@ -287,8 +290,30 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  async updateGymInstructor(gymId, instructorId, instructorData) {
+    const response = await fetch(`${this.baseURL}/gyms/${gymId}/instructors/${instructorId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(instructorData)
+    });
+    
+    return this.handleResponse(response);
+  }
+
   async getGymsByOwner() {
     const response = await fetch(`${this.baseURL}/gyms/owner/gyms`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getAllGyms(params = {}) {
+    const queryParams = new URLSearchParams(params);
+    const response = await fetch(`${this.baseURL}/gyms?${queryParams}`, {
       method: 'GET',
       headers: this.getHeaders(),
       credentials: 'include'
@@ -373,6 +398,155 @@ class ApiService {
 
   async cancelCollaborationRequest(requestId) {
     const response = await fetch(`${this.baseURL}/collaborations/${requestId}/cancel`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // Notification endpoints
+  async getNotifications(page = 1, limit = 20, unreadOnly = false) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      unreadOnly: unreadOnly.toString()
+    });
+
+    const response = await fetch(`${this.baseURL}/notifications?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getUnreadNotificationCount() {
+    const response = await fetch(`${this.baseURL}/notifications/unread-count`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async markNotificationAsRead(notificationId) {
+    const response = await fetch(`${this.baseURL}/notifications/${notificationId}/read`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async markAllNotificationsAsRead() {
+    const response = await fetch(`${this.baseURL}/notifications/mark-all-read`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async deleteNotification(notificationId) {
+    const response = await fetch(`${this.baseURL}/notifications/${notificationId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async deleteAllReadNotifications() {
+    const response = await fetch(`${this.baseURL}/notifications/clear/read`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async sendSystemAnnouncement(title, message, recipients = null, priority = 'medium') {
+    const response = await fetch(`${this.baseURL}/notifications/system-announcement`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ title, message, recipients, priority })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // Gym Request endpoints (instructor to gym)
+  async sendGymRequest(gymId, message) {
+    const response = await fetch(`${this.baseURL}/gym-requests/send`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ gymId, message })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getInstructorGymRequests(status = null) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    
+    const response = await fetch(`${this.baseURL}/gym-requests/my-requests?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getGymRequests(status = null, gymId = null) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (gymId) params.append('gymId', gymId);
+    
+    const response = await fetch(`${this.baseURL}/gym-requests?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async approveGymRequest(requestId, responseMessage = '') {
+    const response = await fetch(`${this.baseURL}/gym-requests/approve/${requestId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ responseMessage })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async rejectGymRequest(requestId, responseMessage = '') {
+    const response = await fetch(`${this.baseURL}/gym-requests/reject/${requestId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ responseMessage })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async cancelGymRequest(requestId) {
+    const response = await fetch(`${this.baseURL}/gym-requests/cancel/${requestId}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       credentials: 'include'

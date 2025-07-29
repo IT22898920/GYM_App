@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from '../utils/api';
+import NotificationBell from './NotificationBell';
 import {
   FiBell,
   FiSearch,
@@ -297,71 +298,7 @@ function AdminHeader({ toggleSidebar, isSidebarOpen }) {
             </button>
 
             {/* Notifications */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="notifications-button p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700/50 relative"
-              >
-                <FiBell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-2 w-2 bg-violet-500 rounded-full animate-pulse"></span>
-              </button>
-
-              {/* Notifications Dropdown */}
-              {showNotifications && (
-                <div className="notifications-menu absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 z-50">
-                  <div className="px-4 py-2 border-b border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-white">
-                        Notifications
-                      </h3>
-                      <span className="text-xs text-gray-400">
-                        Mark all as read
-                      </span>
-                    </div>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {roleData[role].notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`px-4 py-3 hover:bg-gray-700/50 cursor-pointer transition-colors ${
-                          notification.unread ? "bg-gray-700/20" : ""
-                        }`}
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div
-                            className={`p-2 rounded-lg ${
-                              notification.unread
-                                ? "bg-violet-500/10 text-violet-400"
-                                : "bg-gray-700 text-gray-400"
-                            }`}
-                          >
-                            {getNotificationIcon(notification.type)}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                              <h4 className="text-sm font-medium text-white">
-                                {notification.title}
-                              </h4>
-                              <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                                {notification.time}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-400 mt-1">
-                              {notification.message}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="px-4 py-2 border-t border-gray-700">
-                    <button className="w-full text-sm text-violet-400 hover:text-violet-300 transition-colors py-1">
-                      View all notifications
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <NotificationBell />
 
             {/* Profile Dropdown */}
             <div className="relative">

@@ -18,7 +18,8 @@ import {
   removeInstructorFromGym,
   getGymInstructors,
   searchAvailableInstructors,
-  registerGymInstructor
+  registerGymInstructor,
+  updateGymInstructor
 } from '../controllers/gymController.js';
 import { protect, authorize, optionalAuth } from '../middleware/auth.js';
 import { validateGymRegistration, validateGymUpdate } from '../middleware/validation.js';
@@ -53,6 +54,7 @@ router.delete('/:id', authorize('gymOwner', 'admin'), deleteGym);
 router.get('/:gymId/instructors/search', authorize('gymOwner', 'admin'), searchAvailableInstructors);
 router.get('/:gymId/instructors', authorize('gymOwner', 'admin'), getGymInstructors);
 router.post('/:gymId/instructors', authorize('gymOwner', 'admin'), addInstructorToGym);
+router.put('/:gymId/instructors/:instructorId', authorize('gymOwner', 'admin'), updateGymInstructor);
 router.delete('/:gymId/instructors/:instructorId', authorize('gymOwner', 'admin'), removeInstructorFromGym);
 
 // Admin only routes

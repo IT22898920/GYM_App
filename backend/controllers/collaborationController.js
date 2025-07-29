@@ -2,6 +2,7 @@ import CollaborationRequest from '../models/CollaborationRequest.js';
 import InstructorApplication from '../models/InstructorApplication.js';
 import Gym from '../models/Gym.js';
 import User from '../models/User.js';
+import NotificationService from '../services/notificationService.js';
 
 // Send collaboration request to instructor
 export const sendCollaborationRequest = async (req, res) => {
@@ -87,6 +88,9 @@ export const sendCollaborationRequest = async (req, res) => {
       .populate('toInstructor', 'firstName lastName email')
       .populate('gym', 'gymName gymAddress');
 
+    // Send notification to instructor
+    await NotificationService.notifyCollaborationRequest(populatedRequest, 'sent');
+
     res.status(201).json({
       success: true,
       message: 'Collaboration request sent successfully',
@@ -144,7 +148,7 @@ export const getInstructorRequests = async (req, res) => {
 
     const requests = await CollaborationRequest.find(filter)
       .populate('fromGymOwner', 'firstName lastName email')
-      .populate('gym', 'gymName gymAddress facilities')
+      .populate('gym', 'gymName description address contactInfo facilities services amenities capacity establishedYear rating status verificationStatus specialPrograms certifications tags pricing memberCount operatingHours logo images')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -228,6 +232,9 @@ export const respondToRequest = async (req, res) => {
       .populate('toInstructor', 'firstName lastName email')
       .populate('gym', 'gymName');
 
+    // Send notification to gym owner
+    await NotificationService.notifyCollaborationRequest(updatedRequest, action === 'accept' ? 'accepted' : 'rejected');
+
     res.status(200).json({
       success: true,
       message: `Request ${action}ed successfully`,
@@ -268,6 +275,15 @@ export const cancelRequest = async (req, res) => {
 
     // Cancel the request
     await request.cancel();
+
+    // Populate request for notification
+    const populatedRequest = await CollaborationRequest.findById(requestId)
+      .populate('fromGymOwner', 'firstName lastName email')
+      .populate('toInstructor', 'firstName lastName email')
+      .populate('gym', 'gymName');
+
+    // Send notification to instructor
+    await NotificationService.notifyCollaborationRequest(populatedRequest, 'cancelled');
 
     res.status(200).json({
       success: true,

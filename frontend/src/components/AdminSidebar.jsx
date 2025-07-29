@@ -149,6 +149,11 @@ function AdminSidebar({ isOpen }) {
         icon: MdOutlineSportsGymnastics,
         path: "/gym-owner/apply-to-instructor",
       },
+      {
+        title: "Gym Requests",
+        icon: FiCheckCircle,
+        path: "/gym-owner/verify-reject-gym",
+      },
       // {
       //   title: "Verify or Reject Instructors",
       //   icon: FiCheckCircle,
@@ -204,11 +209,11 @@ function AdminSidebar({ isOpen }) {
         icon: FiActivity,
         path: "/instructor/workout-plans",
       },
-      // {
-      //   title: "Apply to Gyms",
-      //   icon: MdOutlineSportsGymnastics,
-      //   path: "/instructor/apply-to-gym",
-      // },
+      {
+        title: "Gym Requests",
+        icon: MdOutlineSportsGymnastics,
+        path: "/instructor/gym-requests",
+      },
       {
         title: "Verify or Reject Gym",
         icon: FiCheckCircle,

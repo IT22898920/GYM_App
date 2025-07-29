@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAlert } from "../../contexts/AlertContext";
+import api from "../../utils/api";
 import {
   FiPlus,
   FiSearch,
@@ -10,6 +12,7 @@ import {
   FiCheck,
   FiX,
   FiUser,
+  FiUsers,
   FiActivity,
   FiCalendar,
   FiStar,
@@ -25,11 +28,17 @@ function Instructors() {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedInstructor, setSelectedInstructor] = useState(null);
+  const [instructors, setInstructors] = useState([]);
+  const [userGyms, setUserGyms] = useState([]);
+  const [selectedGym, setSelectedGym] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { showAlert } = useAlert();
 
+  // Calculate stats from real data
   const stats = [
     {
       title: "Total Instructors",
-      value: "24",
+      value: instructors.length.toString(),
       change: "+12.5%",
       trend: "up",
       icon: FiUser,
@@ -37,88 +46,122 @@ function Instructors() {
       description: "Active instructors",
     },
     {
-      title: "Average Rating",
-      value: "4.8",
+      title: "Active Instructors",
+      value: instructors.filter(i => i.isActive).length.toString(),
       change: "+0.3",
       trend: "up",
       icon: FiStar,
       color: "emerald",
-      description: "Instructor ratings",
+      description: "Currently active",
     },
     {
-      title: "Classes Taught",
-      value: "186",
+      title: "Specializations",
+      value: new Set(instructors.map(i => i.specialization)).size.toString(),
       change: "+15.2%",
       trend: "up",
       icon: FiActivity,
       color: "blue",
-      description: "This month",
+      description: "Different specialties",
     },
     {
-      title: "Avg. Earnings",
-      value: "$2.8K",
+      title: "Avg. Experience",
+      value: instructors.length > 0 ? Math.round(instructors.reduce((acc, i) => acc + (i.instructor?.experience || 0), 0) / instructors.length).toString() + 'y' : '0y',
       change: "+18.7%",
       trend: "up",
       icon: FiDollarSign,
       color: "amber",
-      description: "Per instructor",
+      description: "Years experience",
     },
   ];
 
-  // Sample data for instructors
-  const instructors = [
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      email: "sarah@example.com",
-      specialization: "Yoga",
-      rating: 4.9,
-      classesCount: 156,
-      joinDate: "2024-02-15",
-      status: "active",
-      image: "https://i.pravatar.cc/150?img=1",
-      availability: ["Morning", "Evening"],
-      nextClass: "2024-03-10 09:00 AM",
-    },
-    {
-      id: 2,
-      name: "Mike Chen",
-      email: "mike@example.com",
-      specialization: "Strength Training",
-      rating: 4.8,
-      classesCount: 142,
-      joinDate: "2024-02-01",
-      status: "active",
-      image: "https://i.pravatar.cc/150?img=2",
-      availability: ["Afternoon", "Evening"],
-      nextClass: "2024-03-10 02:00 PM",
-    },
-    {
-      id: 3,
-      name: "Emma Rodriguez",
-      email: "emma@example.com",
-      specialization: "HIIT",
-      rating: 4.7,
-      classesCount: 98,
-      joinDate: "2024-02-20",
-      status: "inactive",
-      image: "https://i.pravatar.cc/150?img=3",
-      availability: ["Morning"],
-      nextClass: null,
-    },
-  ];
+  // Fetch user gyms on component mount
+  useEffect(() => {
+    fetchUserGyms();
+  }, []);
+
+  // Fetch instructors when gym is selected
+  useEffect(() => {
+    if (selectedGym) {
+      fetchInstructors();
+    }
+  }, [selectedGym]);
+
+  const fetchUserGyms = async () => {
+    try {
+      const response = await api.getGymsByOwner();
+      if (response.success) {
+        setUserGyms(response.data);
+        if (response.data.length > 0) {
+          setSelectedGym(response.data[0]); // Select first gym by default
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching gyms:', error);
+      showAlert('Failed to fetch gyms', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchInstructors = async () => {
+    if (!selectedGym) return;
+    
+    try {
+      setLoading(true);
+      const response = await api.getGymInstructors(selectedGym._id);
+      if (response.success) {
+        setInstructors(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching instructors:', error);
+      showAlert('Failed to fetch instructors', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDeleteInstructor = (instructor) => {
     setSelectedInstructor(instructor);
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    // Handle delete logic here
-    console.log("Deleting instructor:", selectedInstructor.id);
-    setShowDeleteModal(false);
-    setSelectedInstructor(null);
+  const confirmDelete = async () => {
+    if (!selectedInstructor || !selectedGym) return;
+    
+    try {
+      await api.removeInstructorFromGym(selectedGym._id, selectedInstructor.instructor._id);
+      showAlert('Instructor removed successfully!', 'success');
+      await fetchInstructors(); // Refresh the list
+    } catch (error) {
+      console.error('Error removing instructor:', error);
+      showAlert(error.message || 'Failed to remove instructor', 'error');
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedInstructor(null);
+    }
   };
+
+  // Filter instructors based on search and filter
+  const filteredInstructors = instructors.filter(instructor => {
+    const matchesSearch = instructor.instructor?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         instructor.instructor?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         instructor.instructor?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         instructor.specialization?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = selectedFilter === 'all' || 
+                         (selectedFilter === 'active' && instructor.isActive) ||
+                         (selectedFilter === 'inactive' && !instructor.isActive);
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -130,13 +173,31 @@ function Instructors() {
           </h1>
           <p className="text-gray-400 mt-1">Manage your gym's instructors</p>
         </div>
-        <Link
-          to="/gym-owner/addInstructor"
-          className="inline-flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-        >
-          <FiPlus className="w-5 h-5 mr-2" />
-          Add Instructor
-        </Link>
+        <div className="flex items-center gap-4">
+          {userGyms.length > 1 && (
+            <select
+              value={selectedGym?._id || ''}
+              onChange={(e) => {
+                const gym = userGyms.find(g => g._id === e.target.value);
+                setSelectedGym(gym);
+              }}
+              className="bg-gray-800 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:outline-none"
+            >
+              {userGyms.map(gym => (
+                <option key={gym._id} value={gym._id}>
+                  {gym.gymName}
+                </option>
+              ))}
+            </select>
+          )}
+          <Link
+            to="/gym-owner/addInstructor"
+            className="inline-flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            <FiPlus className="w-5 h-5 mr-2" />
+            Add Instructor
+          </Link>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -219,99 +280,143 @@ function Instructors() {
         </div>
       </div>
 
-      {/* Instructors Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {instructors.map((instructor) => (
-          <div
-            key={instructor.id}
-            className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50 hover:border-violet-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(124,58,237,0.2)]"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center space-x-4">
-                <img
-                  src={instructor.image}
-                  alt={instructor.name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-                <div>
-                  <h3 className="text-xl font-semibold text-white">
-                    {instructor.name}
-                  </h3>
-                  <p className="text-violet-400">{instructor.specialization}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => handleDeleteInstructor(instructor)}
-                  className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                >
-                  <FiTrash2 className="w-5 h-5" />
-                </button>
-                <Link
-                  to={`/gym-owner/instructors/${instructor.id}/edit`}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
-                >
-                  <FiEdit2 className="w-5 h-5" />
-                </Link>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-yellow-400">
-                  <FiStar className="w-4 h-4 mr-1" />
-                  <span className="text-white">{instructor.rating}</span>
-                </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm ${
-                    instructor.status === "active"
-                      ? "bg-green-500/10 text-green-400"
-                      : "bg-red-500/10 text-red-400"
-                  }`}
-                >
-                  {instructor.status === "active" ? (
-                    <FiCheck className="w-4 h-4 inline mr-1" />
-                  ) : (
-                    <FiX className="w-4 h-4 inline mr-1" />
-                  )}
-                  {instructor.status}
-                </span>
-              </div>
-
-              <div className="space-y-2 text-gray-400">
-                <div className="flex items-center">
-                  <FiMail className="w-4 h-4 mr-2 text-violet-400" />
-                  {instructor.email}
-                </div>
-                <div className="flex items-center">
-                  <FiActivity className="w-4 h-4 mr-2 text-violet-400" />
-                  {instructor.classesCount} classes taught
-                </div>
-                <div className="flex items-center">
-                  <FiCalendar className="w-4 h-4 mr-2 text-violet-400" />
-                  Joined {new Date(instructor.joinDate).toLocaleDateString()}
-                </div>
-                <div className="flex items-center">
-                  <FiClock className="w-4 h-4 mr-2 text-violet-400" />
-                  {instructor.nextClass
-                    ? `Next class: ${instructor.nextClass}`
-                    : "No upcoming classes"}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {instructor.availability.map((time, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm"
-                  >
-                    {time}
-                  </span>
-                ))}
-              </div>
-            </div>
+      {/* Instructors Table */}
+      <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl border border-gray-700/50">
+        {filteredInstructors.length === 0 ? (
+          <div className="text-center py-12">
+            <FiUser className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">No Instructors Found</h3>
+            <p className="text-gray-400 mb-4">
+              {instructors.length === 0 
+                ? "You haven't added any instructors yet." 
+                : "No instructors match your search criteria."}
+            </p>
+            {instructors.length === 0 && (
+              <Link
+                to="/gym-owner/addInstructor"
+                className="inline-flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+              >
+                <FiPlus className="w-5 h-5 mr-2" />
+                Add Your First Instructor
+              </Link>
+            )}
           </div>
-        ))}
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-700/50">
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium text-sm">Instructor</th>
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium text-sm">Contact</th>
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium text-sm">Specialization</th>
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium text-sm">Experience</th>
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium text-sm">Salary</th>
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium text-sm">Joined</th>
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium text-sm">Status</th>
+                  <th className="text-center py-4 px-6 text-gray-300 font-medium text-sm">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInstructors.map((instructor, index) => (
+                  <tr 
+                    key={instructor._id} 
+                    className={`border-b border-gray-700/30 hover:bg-gray-900/30 transition-colors ${
+                      index % 2 === 0 ? 'bg-gray-900/10' : 'bg-transparent'
+                    }`}
+                  >
+                    {/* Instructor Info */}
+                    <td className="py-4 px-6">
+                      <div className="flex items-center space-x-3">
+                        <img
+                          src={`https://ui-avatars.com/api/?name=${instructor.instructor?.firstName || 'Unknown'}+${instructor.instructor?.lastName || 'User'}&background=8b5cf6&color=fff&size=150`}
+                          alt={`${instructor.instructor?.firstName || 'Unknown'} ${instructor.instructor?.lastName || 'User'}`}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                        <div>
+                          <p className="text-white font-medium">
+                            {instructor.instructor?.firstName || 'Unknown'} {instructor.instructor?.lastName || 'User'}
+                          </p>
+                          {instructor.instructor?.phone && (
+                            <p className="text-gray-400 text-sm">{instructor.instructor?.phone}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Email */}
+                    <td className="py-4 px-6">
+                      <p className="text-gray-400 text-sm">{instructor.instructor?.email || 'No email'}</p>
+                    </td>
+
+                    {/* Specialization */}
+                    <td className="py-4 px-6">
+                      <span className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm">
+                        {instructor.specialization || 'General Fitness'}
+                      </span>
+                    </td>
+
+                    {/* Experience */}
+                    <td className="py-4 px-6">
+                      <p className="text-gray-300">{instructor.instructor?.experience || 0} years</p>
+                    </td>
+
+                    {/* Salary */}
+                    <td className="py-4 px-6">
+                      <p className="text-gray-300">
+                        {instructor.salary ? `$${instructor.salary}/month` : '-'}
+                      </p>
+                    </td>
+
+                    {/* Joined Date */}
+                    <td className="py-4 px-6">
+                      <p className="text-gray-400 text-sm">
+                        {new Date(instructor.addedAt).toLocaleDateString()}
+                      </p>
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-4 px-6">
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          instructor.isActive
+                            ? "bg-green-500/10 text-green-400"
+                            : "bg-red-500/10 text-red-400"
+                        }`}
+                      >
+                        {instructor.isActive ? (
+                          <FiCheck className="w-4 h-4 inline mr-1" />
+                        ) : (
+                          <FiX className="w-4 h-4 inline mr-1" />
+                        )}
+                        {instructor.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-4 px-6">
+                      <div className="flex items-center justify-center space-x-2">
+                        <Link
+                          to={`/gym-owner/instructors/${instructor._id}/edit`}
+                          className="p-2 text-gray-400 hover:text-violet-400 transition-colors"
+                          title="Edit Instructor"
+                        >
+                          <FiEdit2 className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteInstructor(instructor)}
+                          className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                          title="Remove Instructor"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -331,8 +436,7 @@ function Instructors() {
               </h3>
 
               <p className="text-gray-400 mb-6">
-                Are you sure you want to delete {selectedInstructor?.name}? This
-                action cannot be undone.
+                Are you sure you want to remove {selectedInstructor?.instructor?.firstName} {selectedInstructor?.instructor?.lastName} from your gym? This action cannot be undone.
               </p>
 
               <div className="mt-6 flex justify-end space-x-4">

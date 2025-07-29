@@ -33,7 +33,6 @@ function AddInstructor() {
   const [selectedGym, setSelectedGym] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [addingInstructor, setAddingInstructor] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedInstructorDetails, setSelectedInstructorDetails] = useState(null);
   
@@ -131,29 +130,6 @@ function AddInstructor() {
     }
   };
 
-  const handleAddInstructor = async (instructor) => {
-    if (!selectedGym) return;
-    
-    try {
-      setAddingInstructor(instructor._id);
-      const instructorData = {
-        instructorId: instructor._id,
-        specialization: instructor.applicationDetails?.specialization || instructor.specialization?.[0] || 'General Fitness'
-      };
-      
-      await api.addInstructorToGym(selectedGym._id, instructorData);
-      showAlert('Instructor added successfully!', 'success');
-      
-      // Refresh lists
-      await fetchCurrentInstructors();
-      await searchAvailableInstructors();
-    } catch (error) {
-      console.error('Error adding instructor:', error);
-      showAlert(error.message || 'Failed to add instructor', 'error');
-    } finally {
-      setAddingInstructor(null);
-    }
-  };
 
   const handleRemoveInstructor = async (instructorId) => {
     if (!selectedGym) return;
@@ -469,8 +445,8 @@ function AddInstructor() {
                         <div className="relative">
                           <div className="h-10 w-10 rounded-full overflow-hidden border border-gray-600">
                             <img
-                              src={`https://ui-avatars.com/api/?name=${gymInstructor.instructor.firstName}+${gymInstructor.instructor.lastName}&background=8b5cf6&color=fff&size=150`}
-                              alt={`${gymInstructor.instructor.firstName} ${gymInstructor.instructor.lastName}`}
+                              src={`https://ui-avatars.com/api/?name=${gymInstructor.instructor?.firstName || 'Unknown'}+${gymInstructor.instructor?.lastName || 'User'}&background=8b5cf6&color=fff&size=150`}
+                              alt={`${gymInstructor.instructor?.firstName || 'Unknown'} ${gymInstructor.instructor?.lastName || 'User'}`}
                               className="h-full w-full object-cover"
                             />
                           </div>
@@ -478,15 +454,15 @@ function AddInstructor() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-white font-medium text-sm truncate">
-                            {gymInstructor.instructor.firstName} {gymInstructor.instructor.lastName}
+                            {gymInstructor.instructor?.firstName || 'Unknown'} {gymInstructor.instructor?.lastName || 'User'}
                           </p>
                           <p className="text-gray-400 text-xs truncate">
-                            {gymInstructor.instructor.email}
+                            {gymInstructor.instructor?.email || 'No email'}
                           </p>
-                          {gymInstructor.instructor.phone && (
+                          {gymInstructor.instructor?.phone && (
                             <p className="text-gray-500 text-xs flex items-center mt-0.5">
                               <FiPhone className="w-3 h-3 mr-1" />
-                              {gymInstructor.instructor.phone}
+                              {gymInstructor.instructor?.phone}
                             </p>
                           )}
                         </div>
@@ -504,7 +480,7 @@ function AddInstructor() {
                     {/* Experience */}
                     <td className="py-4 px-4">
                       <span className="text-white text-sm">
-                        {gymInstructor.instructor.experience || 0} years
+                        {gymInstructor.instructor?.experience || 0} years
                       </span>
                     </td>
 
@@ -578,7 +554,7 @@ function AddInstructor() {
                           <FiEye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleRemoveInstructor(gymInstructor.instructor._id)}
+                          onClick={() => handleRemoveInstructor(gymInstructor.instructor?._id)}
                           className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
                           title="Remove Instructor"
                         >
@@ -1227,26 +1203,13 @@ function AddInstructor() {
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-4 border-t border-gray-700 flex justify-end space-x-3">
+              <div className="px-6 py-4 border-t border-gray-700 flex justify-end">
                 <button
                   onClick={closeDetailsModal}
-                  className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 >
                   Close
                 </button>
-                {/* Only show Add to Gym button if this is not a current gym instructor */}
-                {!selectedInstructorDetails?.salary && (
-                  <button
-                    onClick={() => {
-                      handleAddInstructor(selectedInstructorDetails);
-                      closeDetailsModal();
-                    }}
-                    disabled={addingInstructor === selectedInstructorDetails._id}
-                    className="px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {addingInstructor === selectedInstructorDetails._id ? 'Adding...' : 'Add to Gym'}
-                  </button>
-                )}
               </div>
             </div>
           </div>

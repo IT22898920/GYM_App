@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import { validationResult } from 'express-validator';
+import NotificationService from '../services/notificationService.js';
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -58,6 +59,75 @@ export const register = async (req, res) => {
     // Save refresh token to database
     user.refreshToken = refreshToken;
     await user.save();
+
+    // Send welcome notification based on role
+    try {
+      console.log('🎉 Creating welcome notification for user:', user.email, 'role:', user.role);
+      let welcomeTitle = 'Welcome to FitnessHub! 🎉';
+      let welcomeMessage = '';
+      let link = '';
+
+      switch (user.role) {
+        case 'customer':
+          welcomeMessage = `Welcome ${user.firstName}! Start your fitness journey by exploring gyms in your area and joining classes that match your goals.`;
+          link = '/find-gym';
+          break;
+        case 'gymOwner':
+        case 'gym-owner':
+          welcomeMessage = `Welcome ${user.firstName}! Ready to manage your gym? Register your gym and start building your fitness community.`;
+          link = '/gym-owner/dashboard';
+          break;
+        case 'instructor':
+          welcomeMessage = `Welcome ${user.firstName}! Apply to become a verified instructor and share your expertise with fitness enthusiasts.`;
+          link = '/instructor/dashboard';
+          break;
+        case 'admin':
+          welcomeMessage = `Welcome Admin ${user.firstName}! You have full access to manage the platform and oversee all operations.`;
+          link = '/admin/dashboard';
+          break;
+        default:
+          welcomeMessage = `Welcome ${user.firstName}! Thank you for joining our fitness community. Explore and achieve your fitness goals with us.`;
+          link = '/';
+      }
+
+      console.log('📝 Notification data:', { recipient: user._id, type: 'welcome_message', title: welcomeTitle, message: welcomeMessage });
+      
+      await NotificationService.createNotification({
+        recipient: user._id,
+        type: 'welcome_message',
+        title: welcomeTitle,
+        message: welcomeMessage,
+        link: link,
+        priority: 'medium'
+      });
+      
+      console.log('✅ Welcome notification created successfully');
+
+      // For admin users, also send a system notification to all admins about new user
+      if (user.role !== 'admin') {
+        const adminUsers = await User.find({ role: 'admin', isActive: true }).select('_id');
+        if (adminUsers.length > 0) {
+          await NotificationService.createBulkNotifications({
+            recipients: adminUsers.map(admin => admin._id),
+            type: 'system_announcement',
+            title: 'New User Registration',
+            message: `New ${user.role} registered: ${user.firstName} ${user.lastName} (${user.email})`,
+            data: { 
+              userId: user._id, 
+              userRole: user.role,
+              userName: `${user.firstName} ${user.lastName}`,
+              userEmail: user.email
+            },
+            link: '/admin/users',
+            priority: 'low'
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error('❌ Error sending welcome notification:', notificationError);
+      console.error('❌ Notification error stack:', notificationError.stack);
+      // Don't fail registration if notification fails
+    }
 
     // Set cookies
     res.cookie('token', token, {

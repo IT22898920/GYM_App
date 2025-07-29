@@ -1,6 +1,7 @@
 import InstructorApplication from '../models/InstructorApplication.js';
 import User from '../models/User.js';
 import { deleteFromCloudinary } from '../config/cloudinary.js';
+import NotificationService from '../services/notificationService.js';
 
 // Submit instructor application
 export const submitApplication = async (req, res) => {
@@ -98,6 +99,48 @@ export const submitApplication = async (req, res) => {
     // Populate applicant info
     const populatedApplication = await InstructorApplication.findById(application._id)
       .populate('applicant', 'firstName lastName email role');
+
+    // Send notifications
+    try {
+      // 1. Send confirmation notification to applicant
+      await NotificationService.createNotification({
+        recipient: req.user.id,
+        type: 'instructor_application_submitted',
+        title: 'Application Submitted Successfully! 📝',
+        message: `Your instructor application has been submitted successfully. We will review your application for "${specialization}" specialization and get back to you soon.`,
+        data: {
+          applicationId: application._id,
+          specialization: specialization,
+          experience: experience,
+          isFreelance: isFreelance === 'true'
+        },
+        link: '/apply-instructor',
+        priority: 'medium'
+      });
+
+      // 2. Send notification to all admins
+      const admins = await User.find({ role: 'admin' });
+      for (const admin of admins) {
+        await NotificationService.createNotification({
+          recipient: admin._id,
+          type: 'instructor_application_pending',
+          title: 'New Instructor Application Received 📋',
+          message: `New instructor application from ${firstName} ${lastName} for "${specialization}". Review required for approval.`,
+          data: {
+            applicationId: application._id,
+            applicantName: `${firstName} ${lastName}`,
+            applicantEmail: email,
+            specialization: specialization,
+            experience: experience,
+            isFreelance: isFreelance === 'true'
+          },
+          link: '/admin/instructor-applications',
+          priority: 'high'
+        });
+      }
+    } catch (notificationError) {
+      console.error('Error sending application notifications:', notificationError);
+    }
 
     res.status(201).json({
       success: true,
@@ -283,6 +326,13 @@ export const approveApplication = async (req, res) => {
       .populate('applicant', 'firstName lastName email role')
       .populate('reviewedBy', 'firstName lastName email');
 
+    // Send approval notification
+    try {
+      await NotificationService.notifyInstructorApplication(updatedApplication, 'approved');
+    } catch (notificationError) {
+      console.error('Error sending approval notification:', notificationError);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Instructor application approved successfully',
@@ -329,6 +379,13 @@ export const rejectApplication = async (req, res) => {
     const updatedApplication = await InstructorApplication.findById(id)
       .populate('applicant', 'firstName lastName email role')
       .populate('reviewedBy', 'firstName lastName email');
+
+    // Send rejection notification
+    try {
+      await NotificationService.notifyInstructorApplication(updatedApplication, 'rejected');
+    } catch (notificationError) {
+      console.error('Error sending rejection notification:', notificationError);
+    }
 
     res.status(200).json({
       success: true,
