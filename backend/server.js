@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import gymRoutes from './routes/gymRoutes.js';
+import instructorRoutes from './routes/instructorRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -50,6 +51,7 @@ if (process.env.NODE_ENV === 'development') {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/gyms', gymRoutes);
+app.use('/api/instructors', instructorRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAlert } from '../../contexts/AlertContext';
+import api from '../../utils/api';
 import { 
   FiArrowLeft, 
   FiUser, 
@@ -19,6 +21,7 @@ import {
 
 function ApplyInstructor() {
   const { user } = useAuth();
+  const { showSuccess, showError } = useAlert();
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -187,8 +190,8 @@ function ApplyInstructor() {
             }
           } else if (key === 'certifications') {
             if (formData[key].length > 0) {
-              Array.from(formData[key]).forEach((file, index) => {
-                submitData.append(`certifications`, file);
+              Array.from(formData[key]).forEach((file) => {
+                submitData.append('certifications', file);
               });
             }
           } else if (key === 'availability') {
@@ -198,11 +201,11 @@ function ApplyInstructor() {
           }
         });
 
-        // Submit to API (for now, we'll log it)
-        console.log('Instructor application submitted:', Object.fromEntries(submitData));
+        // Submit to API
+        const response = await api.submitInstructorApplication(submitData);
         
         // Show success message
-        alert('Application submitted successfully! We will review your application and get back to you soon.');
+        showSuccess(response.message || 'Application submitted successfully! We will review your application and get back to you soon.');
         
         // Reset form
         setFormData({
@@ -225,7 +228,7 @@ function ApplyInstructor() {
         
       } catch (error) {
         console.error('Error submitting application:', error);
-        alert('Failed to submit application. Please try again.');
+        showError(error.message || 'Failed to submit application. Please try again.');
       }
       
       setIsSubmitting(false);

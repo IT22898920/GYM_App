@@ -134,6 +134,82 @@ class ApiService {
   async customerLogin(credentials) {
     return this.login({ ...credentials, role: 'customer' });
   }
+
+  // Instructor application endpoints
+  async submitInstructorApplication(formData) {
+    const response = await fetch(`${this.baseURL}/instructors/apply`, {
+      method: 'POST',
+      headers: this.getHeaders(true), // true for FormData
+      credentials: 'include',
+      body: formData
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getMyInstructorApplications() {
+    const response = await fetch(`${this.baseURL}/instructors/my-applications`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getInstructorApplicationById(id) {
+    const response = await fetch(`${this.baseURL}/instructors/${id}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // Admin only instructor application endpoints
+  async getAllInstructorApplications(params = {}) {
+    const queryParams = new URLSearchParams(params);
+    const response = await fetch(`${this.baseURL}/instructors?${queryParams}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async approveInstructorApplication(id, adminNotes = '') {
+    const response = await fetch(`${this.baseURL}/instructors/${id}/approve`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ adminNotes })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async rejectInstructorApplication(id, adminNotes = '') {
+    const response = await fetch(`${this.baseURL}/instructors/${id}/reject`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ adminNotes })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getInstructorApplicationStats() {
+    const response = await fetch(`${this.baseURL}/instructors/admin/stats`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
 }
 
 // Create and export a single instance
