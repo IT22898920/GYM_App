@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAlert } from "../../contexts/AlertContext";
 import {
   FiUsers,
   FiPlus,
@@ -30,10 +31,20 @@ import {
 } from "react-icons/fi";
 
 function Members() {
+  const { showAlert } = useAlert();
+  
   // -------------------------------
   // 1. State for Members
   // -------------------------------
-  const [members, setMembers] = useState(() => generateMembers());
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalMembers: 0,
+    activeMembers: 0,
+    monthlyRevenue: 0,
+    avgAttendance: 0,
+    retentionRate: 0
+  });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -44,11 +55,74 @@ function Members() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedInstructor, setSelectedInstructor] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalMembers: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
 
-  const stats = [
+  // Fetch members and stats on component mount
+  useEffect(() => {
+    fetchMembers();
+    fetchMemberStats();
+  }, [currentPage, searchTerm, selectedFilter]);
+
+  const fetchMembers = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchTerm,
+        status: selectedFilter
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/members?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch members');
+      }
+
+      const data = await response.json();
+      setMembers(data.data);
+      setPagination(data.pagination);
+    } catch (error) {
+      console.error('Error fetching members:', error);
+      showAlert('error', 'Failed to fetch members');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMemberStats = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/members/stats`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch stats');
+      }
+
+      const data = await response.json();
+      setStats(data.data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  const statsData = [
     {
       title: "Total Members",
-      value: "543",
+      value: stats.totalMembers.toString(),
       change: "+12.5%",
       trend: "up",
       icon: FiUsers,
@@ -57,7 +131,7 @@ function Members() {
     },
     {
       title: "Monthly Revenue",
-      value: "$45.6K",
+      value: `$${(stats.monthlyRevenue / 1000).toFixed(1)}K`,
       change: "+23.4%",
       trend: "up",
       icon: FiDollarSign,
@@ -66,7 +140,7 @@ function Members() {
     },
     {
       title: "Attendance Rate",
-      value: "78%",
+      value: `${stats.avgAttendance}%`,
       change: "+5.2%",
       trend: "up",
       icon: FiActivity,
@@ -75,7 +149,7 @@ function Members() {
     },
     {
       title: "Retention Rate",
-      value: "92%",
+      value: `${stats.retentionRate}%`,
       change: "+8.7%",
       trend: "up",
       icon: FiHeart,
@@ -116,89 +190,11 @@ function Members() {
   ];
 
   // -------------------------------
-  // 2. Generate Member Data
-  // -------------------------------
-  function generateMembers() {
-    const baseMembers = [
-      {
-        id: 1,
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+1 (555) 123-4567",
-        address: "123 Fitness Street, NY",
-        joinDate: "2024-02-15",
-        plan: "Premium",
-        status: "active",
-        lastVisit: "2024-03-05",
-        attendance: 85,
-        image: "https://i.pravatar.cc/150?img=1",
-        nextPayment: "2024-04-01",
-        paymentStatus: "paid",
-        goals: ["Weight Loss", "Muscle Gain"],
-        instructor: "Sarah Johnson",
-        classesAttended: 24,
-        progress: 75,
-      },
-      {
-        id: 2,
-        name: "Sarah Smith",
-        email: "sarah@example.com",
-        phone: "+1 (555) 234-5678",
-        address: "456 Health Ave, NY",
-        joinDate: "2024-01-20",
-        plan: "Basic",
-        status: "active",
-        lastVisit: "2024-03-06",
-        attendance: 92,
-        image: "https://i.pravatar.cc/150?img=2",
-        nextPayment: "2024-03-20",
-        paymentStatus: "pending",
-        goals: ["Flexibility", "Cardio"],
-        instructor: "Mike Chen",
-        classesAttended: 18,
-        progress: 60,
-      },
-      {
-        id: 3,
-        name: "Mike Johnson",
-        email: "mike@example.com",
-        phone: "+1 (555) 345-6789",
-        address: "789 Wellness Blvd, NY",
-        joinDate: "2024-02-01",
-        plan: "Elite",
-        status: "inactive",
-        lastVisit: "2024-02-28",
-        attendance: 45,
-        image: "https://i.pravatar.cc/150?img=3",
-        nextPayment: "2024-03-01",
-        paymentStatus: "overdue",
-        goals: ["Strength Training"],
-        instructor: null,
-        classesAttended: 12,
-        progress: 30,
-      },
-    ];
-
-    // Generate 50 members for demonstration
-    return Array.from({ length: 50 }, (_, index) => {
-      const baseMember = baseMembers[index % baseMembers.length];
-      return {
-        ...baseMember,
-        id: index + 1,
-        name: `${baseMember.name} ${
-          Math.floor(index / baseMembers.length) + 1
-        }`,
-        email: `member${index + 1}@example.com`,
-      };
-    });
-  }
-
-  // -------------------------------
-  // 3. Handle Assign/Update
+  // 2. Handle Assign/Update
   // -------------------------------
   const handleAssignInstructor = (member) => {
     setSelectedMember(member);
-    setSelectedInstructor(member.instructor || "");
+    setSelectedInstructor(member.assignedInstructor?._id || "");
     setShowAssignModal(true);
   };
 
@@ -208,53 +204,70 @@ function Members() {
     setIsUpdating(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/members/${selectedMember._id}/assign-instructor`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ instructorId: selectedInstructor })
+        }
+      );
 
-      // Update the instructor in the state
-      setMembers((prevMembers) => {
-        return prevMembers.map((m) => {
-          if (m.id === selectedMember.id) {
-            return {
-              ...m,
-              instructor: selectedInstructor,
-            };
-          }
-          return m;
-        });
-      });
+      if (!response.ok) {
+        throw new Error('Failed to assign instructor');
+      }
+
+      // Refresh members list
+      await fetchMembers();
 
       // Close modal and reset state
       setShowAssignModal(false);
       setSelectedMember(null);
       setSelectedInstructor("");
 
-      console.log("Instructor assigned/updated successfully!");
+      showAlert('success', 'Instructor assigned successfully!');
     } catch (error) {
       console.error("Error assigning instructor:", error);
+      showAlert('error', 'Failed to assign instructor');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // -------------------------------
-  // 4. Filtering / Pagination
-  // -------------------------------
-  const filteredMembers = members.filter((member) => {
-    const matchesSearch =
-      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter =
-      selectedFilter === "all" || member.status === selectedFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const handleDeleteMember = async (memberId) => {
+    if (!window.confirm('Are you sure you want to delete this member?')) {
+      return;
+    }
 
-  const totalItems = filteredMembers.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentMembers = filteredMembers.slice(startIndex, endIndex);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/members/${memberId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
 
+      if (!response.ok) {
+        throw new Error('Failed to delete member');
+      }
+
+      showAlert('success', 'Member deleted successfully');
+      fetchMembers();
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      showAlert('error', 'Failed to delete member');
+    }
+  };
+
+  // -------------------------------
+  // 3. Pagination handlers
+  // -------------------------------
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
@@ -263,6 +276,15 @@ function Members() {
     setItemsPerPage(Number(e.target.value));
     setCurrentPage(1);
   };
+
+  // Handle search with debounce
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setCurrentPage(1);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   // -------------------------------
   // Render
@@ -313,7 +335,7 @@ function Members() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {statsData.map((stat, index) => (
           <div
             key={index}
             className="group bg-gray-800/50 backdrop-blur-lg rounded-xl p-6 border border-gray-700/50 hover:bg-gray-800/70 transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_30px_rgba(124,58,237,0.2)] relative overflow-hidden"
@@ -422,21 +444,32 @@ function Members() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
-                {currentMembers.map((member) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan="7" className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600 mx-auto"></div>
+                    </td>
+                  </tr>
+                ) : members.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="text-center py-8 text-gray-400">
+                      No members found. Add your first member!
+                    </td>
+                  </tr>
+                ) : (
+                  members.map((member) => (
                   <tr
-                    key={member.id}
+                    key={member._id}
                     className="hover:bg-gray-700/20 transition-colors"
                   >
                     <td className="p-4">
                       <div className="flex items-center space-x-3">
-                        <img
-                          src={member.image}
-                          alt={member.name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
+                        <div className="w-10 h-10 rounded-full bg-violet-500 flex items-center justify-center text-white font-semibold">
+                          {member.firstName[0]}{member.lastName[0]}
+                        </div>
                         <div>
                           <div className="font-medium text-white">
-                            {member.name}
+                            {member.firstName} {member.lastName}
                           </div>
                           <div className="text-sm text-gray-400">
                             Joined{" "}
@@ -448,12 +481,12 @@ function Members() {
                     <td className="p-4">
                       <div className="text-gray-300">{member.email}</div>
                       <div className="text-sm text-gray-400">
-                        {member.phone}
+                        {member.phoneNumber}
                       </div>
                     </td>
                     <td className="p-4">
                       <span className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm">
-                        {member.plan}
+                        {member.membershipPlan.name}
                       </span>
                     </td>
 
@@ -463,14 +496,18 @@ function Members() {
                       Otherwise, we show "Assign Instructor".
                     */}
                     <td className="p-4">
-                      {member.instructor ? (
-                        <button
-                          onClick={() => handleAssignInstructor(member)}
-                          className="flex items-center text-emerald-400 hover:text-emerald-300 transition-colors"
-                        >
-                          <FiUserCheck className="w-4 h-4 mr-1" />
-                          Update Instructor
-                        </button>
+                      {member.assignedInstructor ? (
+                        <div>
+                          <div className="text-sm text-gray-300">
+                            {member.assignedInstructor.firstName} {member.assignedInstructor.lastName}
+                          </div>
+                          <button
+                            onClick={() => handleAssignInstructor(member)}
+                            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                          >
+                            Change
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => handleAssignInstructor(member)}
@@ -514,7 +551,7 @@ function Members() {
                     <td className="p-4">
                       <div className="flex items-center space-x-3">
                         <Link
-                          to={`/gym-owner/members/${member.id}/progress`}
+                          to={`/gym-owner/members/${member._id}/progress`}
                           className="p-2 text-gray-400 hover:text-white transition-colors"
                         >
                           <FiBarChart2 className="w-5 h-5" />
@@ -522,7 +559,10 @@ function Members() {
                         <button className="p-2 text-gray-400 hover:text-white transition-colors">
                           <FiEdit2 className="w-5 h-5" />
                         </button>
-                        <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
+                        <button 
+                          onClick={() => handleDeleteMember(member._id)}
+                          className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                        >
                           <FiTrash2 className="w-5 h-5" />
                         </button>
                         <button className="p-2 text-gray-400 hover:text-white transition-colors">
@@ -531,7 +571,7 @@ function Members() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -556,8 +596,8 @@ function Members() {
 
             <div className="flex items-center gap-2">
               <div className="text-sm text-gray-400">
-                Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of{" "}
-                {totalItems} entries
+                Showing {members.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} to {Math.min(currentPage * itemsPerPage, pagination.totalMembers)} of{" "}
+                {pagination.totalMembers} entries
               </div>
 
               <div className="flex items-center gap-1">
@@ -578,12 +618,12 @@ function Members() {
 
                 {/* Page Numbers */}
                 <div className="flex items-center gap-1">
-                  {[...Array(totalPages)].map((_, index) => {
+                  {[...Array(pagination.totalPages)].map((_, index) => {
                     const pageNumber = index + 1;
                     // Show first page, last page, current page, and one page around current page
                     if (
                       pageNumber === 1 ||
-                      pageNumber === totalPages ||
+                      pageNumber === pagination.totalPages ||
                       (pageNumber >= currentPage - 1 &&
                         pageNumber <= currentPage + 1)
                     ) {
@@ -616,14 +656,14 @@ function Members() {
 
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
+                  disabled={!pagination.hasNextPage}
                   className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <FiChevronRight className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={() => handlePageChange(totalPages)}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  disabled={currentPage === pagination.totalPages}
                   className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <FiChevronsRight className="w-5 h-5" />
@@ -635,21 +675,28 @@ function Members() {
       ) : (
         /* GRID VIEW */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {currentMembers.map((member) => (
+          {loading ? (
+            <div className="col-span-full flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
+            </div>
+          ) : members.length === 0 ? (
+            <div className="col-span-full text-center py-8 text-gray-400">
+              No members found. Add your first member!
+            </div>
+          ) : (
+            members.map((member) => (
             <div
-              key={member.id}
+              key={member._id}
               className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50 hover:border-violet-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(124,58,237,0.2)]"
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-4">
-                  <img
-                    src={member.image}
-                    alt={member.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
+                  <div className="w-12 h-12 rounded-full bg-violet-500 flex items-center justify-center text-white font-semibold">
+                    {member.firstName[0]}{member.lastName[0]}
+                  </div>
                   <div>
                     <h3 className="text-xl font-semibold text-white">
-                      {member.name}
+                      {member.firstName} {member.lastName}
                     </h3>
                     <span
                       className={`px-3 py-1 rounded-full text-sm ${
@@ -671,7 +718,10 @@ function Members() {
                   <button className="p-2 text-gray-400 hover:text-white transition-colors">
                     <FiEdit2 className="w-5 h-5" />
                   </button>
-                  <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
+                  <button 
+                    onClick={() => handleDeleteMember(member._id)}
+                    className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                  >
                     <FiTrash2 className="w-5 h-5" />
                   </button>
                 </div>
@@ -685,33 +735,35 @@ function Members() {
                   </div>
                   <div className="flex items-center">
                     <FiPhone className="w-4 h-4 mr-2 text-violet-400" />
-                    {member.phone}
+                    {member.phoneNumber}
                   </div>
-                  <div className="flex items-center">
-                    <FiMapPin className="w-4 h-4 mr-2 text-violet-400" />
-                    {member.address}
-                  </div>
+                  {member.address && (
+                    <div className="flex items-center">
+                      <FiMapPin className="w-4 h-4 mr-2 text-violet-400" />
+                      {member.address}
+                    </div>
+                  )}
                   <div className="flex items-center">
                     <FiCalendar className="w-4 h-4 mr-2 text-violet-400" />
-                    Last visit: {member.lastVisit}
+                    Last visit: {member.lastVisit ? new Date(member.lastVisit).toLocaleDateString() : 'Never'}
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <span className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm">
-                    {member.plan} Plan
+                    {member.membershipPlan.name} Plan
                   </span>
                   <span
                     className={`px-3 py-1 rounded-full text-sm ${
-                      member.paymentStatus === "paid"
+                      member.paymentDetails?.paymentStatus === "paid"
                         ? "bg-green-500/10 text-green-400"
-                        : member.paymentStatus === "pending"
+                        : member.paymentDetails?.paymentStatus === "pending"
                         ? "bg-yellow-500/10 text-yellow-400"
                         : "bg-red-500/10 text-red-400"
                     }`}
                   >
-                    {member.paymentStatus?.charAt(0).toUpperCase() +
-                      member.paymentStatus?.slice(1)}
+                    {member.paymentDetails?.paymentStatus?.charAt(0).toUpperCase() +
+                      member.paymentDetails?.paymentStatus?.slice(1)}
                   </span>
                 </div>
 
@@ -719,7 +771,7 @@ function Members() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-gray-400">
                     <span>Assigned Instructor</span>
-                    {member.instructor ? (
+                    {member.assignedInstructor ? (
                       <button
                         onClick={() => handleAssignInstructor(member)}
                         className="flex items-center text-emerald-400 hover:text-emerald-300 transition-colors"
@@ -753,7 +805,7 @@ function Members() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {member.goals.map((goal, index) => (
+                  {member.fitnessGoals?.map((goal, index) => (
                     <span
                       key={index}
                       className="px-3 py-1 bg-gray-900/50 text-gray-300 rounded-full text-sm"
@@ -765,14 +817,14 @@ function Members() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <Link
-                    to={`/gym-owner/members/${member.id}/progress`}
+                    to={`/gym-owner/members/${member._id}/progress`}
                     className="flex items-center justify-center px-4 py-2 bg-violet-600/20 text-violet-400 rounded-lg hover:bg-violet-600/30 transition-colors"
                   >
                     <FiBarChart2 className="w-4 h-4 mr-2" />
                     View Progress
                   </Link>
                   <Link
-                    to={`/gym-owner/members/${member.id}/details`}
+                    to={`/gym-owner/members/${member._id}/details`}
                     className="flex items-center justify-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
                   >
                     View Details
@@ -780,7 +832,7 @@ function Members() {
                 </div>
               </div>
             </div>
-          ))}
+          )))}
         </div>
       )}
 
@@ -800,8 +852,8 @@ function Members() {
             <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 rounded-2xl border border-gray-700 shadow-xl">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-white">
-                  {selectedMember.instructor ? "Update" : "Assign"} Instructor
-                  for {selectedMember.name}
+                  {selectedMember.assignedInstructor ? "Update" : "Assign"} Instructor
+                  for {selectedMember.firstName} {selectedMember.lastName}
                 </h3>
                 <button
                   onClick={() => {
@@ -817,13 +869,13 @@ function Members() {
 
               <div className="space-y-6">
                 {/* Current Instructor (if any) */}
-                {selectedMember.instructor && (
+                {selectedMember.assignedInstructor && (
                   <div className="p-4 bg-gray-900/50 rounded-lg">
                     <div className="text-sm text-gray-400 mb-2">
                       Current Instructor
                     </div>
                     <div className="text-white">
-                      {selectedMember.instructor}
+                      {selectedMember.assignedInstructor.firstName} {selectedMember.assignedInstructor.lastName}
                     </div>
                   </div>
                 )}
@@ -842,8 +894,8 @@ function Members() {
                       <input
                         type="radio"
                         name="instructor"
-                        value={instructor.name}
-                        checked={selectedInstructor === instructor.name}
+                        value={instructor.id}
+                        checked={selectedInstructor === instructor.id}
                         onChange={(e) => setSelectedInstructor(e.target.value)}
                         className="hidden"
                       />

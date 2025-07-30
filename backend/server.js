@@ -13,6 +13,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import gymRequestRoutes from './routes/gymRequestRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import callRoutes from './routes/callRoutes.js';
+import memberRoutes from './routes/memberRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -64,6 +65,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/gym-requests', gymRequestRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/members', memberRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

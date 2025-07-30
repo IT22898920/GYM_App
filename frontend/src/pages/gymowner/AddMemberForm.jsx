@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAlert } from "../../contexts/AlertContext";
 import {
   Elements,
   CardElement,
@@ -37,36 +39,6 @@ const fitnessGoals = [
   "Body Recomposition",
   "Athletic Performance",
   "General Fitness",
-];
-
-const membershipPlans = [
-  {
-    name: "Basic",
-    price: 29.99,
-    features: [
-      "Access to gym equipment",
-      "Locker room access",
-      "Basic fitness assessment",
-    ],
-  },
-  {
-    name: "Premium",
-    price: 49.99,
-    features: [
-      "All Basic features",
-      "2 Personal training sessions",
-      "Nutrition consultation",
-    ],
-  },
-  {
-    name: "Elite",
-    price: 99.99,
-    features: [
-      "All Premium features",
-      "Unlimited training sessions",
-      "Priority booking",
-    ],
-  },
 ];
 
 function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
@@ -117,7 +89,7 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-white">Payment Method</h3>
           <span className="text-2xl font-bold text-white">
-            ${selectedPlan.price}
+            ${selectedPlan?.price || 0}
           </span>
         </div>
 
@@ -211,8 +183,12 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
   );
 }
 
-export default function AddMemberForm({ onSuccess, onCancel }) {
+export default function AddMemberForm() {
+  const navigate = useNavigate();
+  const { showAlert } = useAlert();
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [membershipPlans, setMembershipPlans] = useState([]);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -231,10 +207,43 @@ export default function AddMemberForm({ onSuccess, onCancel }) {
     biceps: "",
     thighs: "",
     fitnessGoals: [],
-    membershipPlan: membershipPlans[0].name,
+    membershipPlan: "",
   });
 
   const [errors, setErrors] = useState({});
+
+  // Fetch gym's membership plans
+  useEffect(() => {
+    const fetchMembershipPlans = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/members/membership-plans`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch membership plans');
+        }
+
+        const data = await response.json();
+        setMembershipPlans(data.data.membershipPlans);
+        
+        // Set the first plan as default
+        if (data.data.membershipPlans.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            membershipPlan: data.data.membershipPlans[0].name
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching membership plans:', error);
+        showAlert('error', 'Failed to load membership plans');
+      }
+    };
+
+    fetchMembershipPlans();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -292,6 +301,9 @@ export default function AddMemberForm({ onSuccess, onCancel }) {
       if (!formData.height) newErrors.height = "Height is required";
       if (!formData.weight) newErrors.weight = "Weight is required";
       if (!formData.waist) newErrors.waist = "Waist measurement is required";
+    } else if (step === 3) {
+      if (!formData.membershipPlan) newErrors.membershipPlan = "Please select a membership plan";
+      if (membershipPlans.length === 0) newErrors.membershipPlan = "No membership plans available";
     }
 
     setErrors(newErrors);
@@ -308,11 +320,45 @@ export default function AddMemberForm({ onSuccess, onCancel }) {
     setStep((prev) => prev - 1);
   };
 
-  const handlePaymentSuccess = (paymentDetails) => {
-    onSuccess({
-      ...formData,
-      paymentDetails,
-    });
+  const handlePaymentSuccess = async (paymentDetails) => {
+    setLoading(true);
+    
+    try {
+      // Find the selected plan details
+      const selectedPlanDetails = membershipPlans.find(
+        plan => plan.name === formData.membershipPlan
+      );
+
+      const memberData = {
+        ...formData,
+        membershipPrice: selectedPlanDetails.price,
+        membershipFeatures: selectedPlanDetails.benefits || selectedPlanDetails.features || [],
+        paymentDetails
+      };
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(memberData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to add member');
+      }
+
+      showAlert('success', 'Member added successfully!');
+      navigate('/gym-owner/members');
+    } catch (error) {
+      console.error('Error adding member:', error);
+      showAlert('error', error.message || 'Failed to add member');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectedPlan = membershipPlans.find(
@@ -534,7 +580,7 @@ export default function AddMemberForm({ onSuccess, onCancel }) {
           <div className="flex justify-end space-x-4">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => navigate('/gym-owner/members')}
               className="px-6 py-2 text-gray-400 hover:text-white transition-colors"
             >
               Cancel
@@ -706,8 +752,14 @@ export default function AddMemberForm({ onSuccess, onCancel }) {
               <h3 className="text-lg font-medium text-white mb-4">
                 Membership Plan
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {membershipPlans.map((plan) => (
+              {membershipPlans.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600 mx-auto mb-4"></div>
+                  <p className="text-gray-400">Loading membership plans...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {membershipPlans.map((plan) => (
                   <label
                     key={plan.name}
                     className={`block p-4 rounded-lg border cursor-pointer transition-all ${
@@ -732,21 +784,30 @@ export default function AddMemberForm({ onSuccess, onCancel }) {
                           /month
                         </span>
                       </div>
+                      <div className="text-sm text-gray-400 mt-2">
+                        Duration: {plan.duration}
+                      </div>
                       <ul className="mt-4 space-y-2">
-                        {plan.features.map((feature, index) => (
+                        {(plan.benefits || []).map((benefit, index) => (
                           <li
                             key={index}
                             className="text-sm text-gray-400 flex items-center"
                           >
                             <span className="w-1.5 h-1.5 bg-violet-500 rounded-full mr-2"></span>
-                            {feature}
+                            {benefit}
                           </li>
                         ))}
                       </ul>
                     </div>
                   </label>
                 ))}
-              </div>
+                </div>
+              )}
+              {errors.membershipPlan && (
+                <p className="text-red-500 text-sm mt-2">
+                  {errors.membershipPlan}
+                </p>
+              )}
             </div>
 
             <div>
