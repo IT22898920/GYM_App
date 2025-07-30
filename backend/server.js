@@ -2,6 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import gymRoutes from './routes/gymRoutes.js';
@@ -9,6 +11,8 @@ import instructorRoutes from './routes/instructorRoutes.js';
 import collaborationRoutes from './routes/collaborationRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import gymRequestRoutes from './routes/gymRequestRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import callRoutes from './routes/callRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -58,6 +62,8 @@ app.use('/api/instructors', instructorRoutes);
 app.use('/api/collaborations', collaborationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/gym-requests', gymRequestRoutes);
+app.use('/api/chats', chatRoutes);
+app.use('/api/calls', callRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -154,10 +160,101 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+const server = createServer(app);
+
+// Initialize Socket.io with CORS
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// WebRTC signaling namespace
+const webrtcNamespace = io.of('/webrtc');
+
+// Store active call sessions
+const activeCalls = new Map();
+
+webrtcNamespace.on('connection', (socket) => {
+  console.log(`WebRTC client connected: ${socket.id}`);
+
+  // Join call room
+  socket.on('join-call', (callId) => {
+    socket.join(callId);
+    console.log(`Socket ${socket.id} joined call room: ${callId}`);
+    
+    // Track active call
+    if (!activeCalls.has(callId)) {
+      activeCalls.set(callId, new Set());
+    }
+    activeCalls.get(callId).add(socket.id);
+  });
+
+  // Handle WebRTC signaling
+  socket.on('webrtc-offer', (data) => {
+    console.log(`WebRTC offer from ${socket.id} to room ${data.callId}`);
+    socket.to(data.callId).emit('webrtc-offer', {
+      offer: data.offer,
+      from: socket.id
+    });
+  });
+
+  socket.on('webrtc-answer', (data) => {
+    console.log(`WebRTC answer from ${socket.id} to room ${data.callId}`);
+    socket.to(data.callId).emit('webrtc-answer', {
+      answer: data.answer,
+      from: socket.id
+    });
+  });
+
+  socket.on('webrtc-ice-candidate', (data) => {
+    console.log(`ICE candidate from ${socket.id} to room ${data.callId}`);
+    socket.to(data.callId).emit('webrtc-ice-candidate', {
+      candidate: data.candidate,
+      from: socket.id
+    });
+  });
+
+  // Handle call end
+  socket.on('end-call', (callId) => {
+    console.log(`Call ended by ${socket.id} in room ${callId}`);
+    socket.to(callId).emit('call-ended');
+    socket.leave(callId);
+    
+    // Clean up active call tracking
+    if (activeCalls.has(callId)) {
+      activeCalls.get(callId).delete(socket.id);
+      if (activeCalls.get(callId).size === 0) {
+        activeCalls.delete(callId);
+      }
+    }
+  });
+
+  // Handle disconnect
+  socket.on('disconnect', () => {
+    console.log(`WebRTC client disconnected: ${socket.id}`);
+    
+    // Clean up from all active calls
+    for (const [callId, participants] of activeCalls.entries()) {
+      if (participants.has(socket.id)) {
+        participants.delete(socket.id);
+        socket.to(callId).emit('participant-left', socket.id);
+        
+        if (participants.size === 0) {
+          activeCalls.delete(callId);
+        }
+      }
+    }
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
   console.log(`API URL: http://localhost:${PORT}`);
   console.log(`Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+  console.log(`WebRTC Socket.io server initialized on /webrtc namespace`);
 });
 
 // Handle unhandled promise rejections

@@ -4,8 +4,10 @@ import {
   Route,
   useLocation,
 } from "react-router-dom";
+import './styles/chat.css';
 import { AuthProvider } from "./contexts/AuthContext";
 import { AlertProvider } from "./contexts/AlertContext";
+import { CallProvider } from "./contexts/CallContext";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home/Home";
@@ -50,6 +52,7 @@ import EditGymDetails from "./pages/gymowner/EditGymDetails";
 import ManageImages from "./pages/gymowner/ManageImages";
 import UpdateLocation from "./pages/gymowner/UpdateLocation";
 import ContactInfo from "./pages/gymowner/ContactInfo";
+import GymOwnerMessages from "./pages/gymowner/Messages";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -75,6 +78,7 @@ import VerifyRejectGym from "./pages/instructor/VerifyRejectGym";
 import FreelanceStudents from "./pages/instructor/Student/FreelanceStudents";
 import GymStudents from "./pages/instructor/Student/GymStudents";
 import AddMemberForm from "./pages/gymowner/AddMemberForm";
+import InstructorMessages from "./pages/instructor/Messages";
 
 import FinanceAdmin from "./pages/admin/Finance";
 import CustomerRegisterGym from "./pages/CustomerRegisterGym";
@@ -86,7 +90,9 @@ function App() {
     <Router>
       <AlertProvider>
         <AuthProvider>
-          <AppContent />
+          <CallProvider>
+            <AppContent />
+          </CallProvider>
         </AuthProvider>
       </AlertProvider>
     </Router>
@@ -149,6 +155,7 @@ function AppContent() {
           <Route path="manage-images" element={<ManageImages />} />
           <Route path="update-location" element={<UpdateLocation />} />
           <Route path="contact-info" element={<ContactInfo />} />
+          <Route path="messages" element={<GymOwnerMessages />} />
 
           <Route
             path="verify-reject-instructor"
@@ -181,6 +188,7 @@ function AppContent() {
           <Route path="apply-to-gym" element={<ApplyToGym />} />
           <Route path="gym-requests" element={<GymRequests />} />
           <Route path="verify-reject-gym" element={<VerifyRejectGym />} />
+          <Route path="messages" element={<InstructorMessages />} />
         </Route>
 
         {/* Public Routes */}

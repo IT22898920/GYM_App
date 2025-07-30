@@ -554,6 +554,110 @@ class ApiService {
     
     return this.handleResponse(response);
   }
+
+  // Chat endpoints
+  async getUserChats() {
+    const response = await fetch(`${this.baseURL}/chats`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getOrCreateChat(collaborationId) {
+    const response = await fetch(`${this.baseURL}/chats/collaboration/${collaborationId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async sendChatMessage(chatId, content) {
+    const response = await fetch(`${this.baseURL}/chats/${chatId}/messages`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ content })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async markChatAsRead(chatId) {
+    const response = await fetch(`${this.baseURL}/chats/${chatId}/read`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getChatUnreadCount() {
+    const response = await fetch(`${this.baseURL}/chats/unread-count`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // Call endpoints
+  async initiateCall(chatId, callType) {
+    const response = await fetch(`${this.baseURL}/calls/initiate`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ chatId, callType })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async acceptCall(callId) {
+    const response = await fetch(`${this.baseURL}/calls/${callId}/accept`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async rejectCall(callId) {
+    const response = await fetch(`${this.baseURL}/calls/${callId}/reject`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async endCall(callId) {
+    const response = await fetch(`${this.baseURL}/calls/${callId}/end`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getCallHistory(page = 1, limit = 20) {
+    const response = await fetch(`${this.baseURL}/calls/history?page=${page}&limit=${limit}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
 }
 
 // Create and export a single instance

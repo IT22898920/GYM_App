@@ -2,6 +2,7 @@ import CollaborationRequest from '../models/CollaborationRequest.js';
 import InstructorApplication from '../models/InstructorApplication.js';
 import Gym from '../models/Gym.js';
 import User from '../models/User.js';
+import Chat from '../models/Chat.js';
 import NotificationService from '../services/notificationService.js';
 
 // Send collaboration request to instructor
@@ -221,6 +222,22 @@ export const respondToRequest = async (req, res) => {
       if (!gym.instructors.includes(instructorId)) {
         gym.instructors.push(instructorId);
         await gym.save();
+      }
+
+      // Create chat for the collaboration
+      const existingChat = await Chat.findOne({
+        collaborationRequest: requestId
+      });
+      
+      if (!existingChat) {
+        const chat = new Chat({
+          participants: [request.fromGymOwner, instructorId],
+          collaborationRequest: requestId,
+          gym: request.gym,
+          messages: []
+        });
+        
+        await chat.save();
       }
     } else {
       await request.reject(responseMessage);

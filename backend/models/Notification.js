@@ -39,6 +39,14 @@ const notificationSchema = new mongoose.Schema({
       'collaboration_request_rejected',
       'collaboration_request_cancelled',
       
+      // Chat related
+      'new_chat_message',
+      'incoming_call',
+      'call_accepted',
+      'call_rejected',
+      'call_ended',
+      'call_missed',
+      
       // Gym request related (instructor to gym)
       'gym_request_sent',
       'gym_request_received',

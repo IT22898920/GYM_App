@@ -4,16 +4,20 @@ import User from '../models/User.js';
 // Protect routes
 export const protect = async (req, res, next) => {
   try {
+    console.log(`🔐 Auth middleware: ${req.method} ${req.path} - Checking authentication`);
     let token;
 
     // Check for token in cookies first, then in Authorization header
     if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
+      console.log('🔐 Auth middleware: Token found in cookies');
     } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+      console.log('🔐 Auth middleware: Token found in Authorization header');
     }
 
     if (!token) {
+      console.log('❌ Auth middleware: No token found');
       return res.status(401).json({
         success: false,
         message: 'Not authorized to access this route'
@@ -23,11 +27,13 @@ export const protect = async (req, res, next) => {
     try {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log(`🔐 Auth middleware: Token verified for user ${decoded.userId}`);
       
       // Get user from token
       req.user = await User.findById(decoded.userId).select('-password');
       
       if (!req.user) {
+        console.log(`❌ Auth middleware: User not found for ID ${decoded.userId}`);
         return res.status(401).json({
           success: false,
           message: 'User not found'
@@ -39,14 +45,17 @@ export const protect = async (req, res, next) => {
       req.user.id = req.user._id.toString();
 
       if (!req.user.isActive) {
+        console.log(`❌ Auth middleware: User account deactivated for ${req.user.id}`);
         return res.status(403).json({
           success: false,
           message: 'Account is deactivated'
         });
       }
 
+      console.log(`✅ Auth middleware: Authentication successful for user ${req.user.id}`);
       next();
     } catch (error) {
+      console.log(`❌ Auth middleware: Token verification failed - ${error.message}`);
       return res.status(401).json({
         success: false,
         message: 'Not authorized to access this route'
