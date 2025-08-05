@@ -3,6 +3,25 @@ import User from '../models/User.js';
 import Gym from '../models/Gym.js';
 import bcrypt from 'bcryptjs';
 import NotificationService from '../services/notificationService.js';
+import multer from 'multer';
+import path from 'path';
+import { uploadToCloudinary, receiptOptions } from '../config/cloudinary.js';
+
+// Configure multer for receipt uploads (memory storage for Cloudinary)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  fileFilter: function (req, file, cb) {
+    // Accept images and PDFs
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files and PDFs are allowed!'), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+export const uploadReceipt = upload.single('receipt');
 
 // Get gym's membership plans
 export const getGymMembershipPlans = async (req, res) => {
@@ -513,6 +532,339 @@ export const getMemberStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch member statistics',
+      error: error.message
+    });
+  }
+};
+
+// Register customer to gym
+export const registerCustomerToGym = async (req, res) => {
+  try {    
+    console.log('DEBUG - Raw request body:', req.body);
+    console.log('DEBUG - Request file:', req.file ? 'File uploaded' : 'No file');
+    
+    const { gymId } = req.params;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      gender,
+      dateOfBirth,
+      height,
+      weight,
+      bmi,
+      bodyFat,
+      waist,
+      hips,
+      biceps,
+      chest,
+      thighs,
+      fitnessGoals,
+      plan,
+      paymentMethod,
+      healthConditions,
+      emergencyContact
+    } = req.body;
+
+    // Validation check
+    if (!firstName || !lastName || !email || !phone || !gender || !dateOfBirth || 
+        !height || !weight || !waist || !plan || !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    // Find the gym
+    const gym = await Gym.findById(gymId).populate('owner', 'firstName lastName email _id');
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    if (!gym.owner || !gym.owner._id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gym owner not found'
+      });
+    }
+
+    // Check if customer already exists
+    let customer = await User.findOne({ email, role: 'customer' });
+    
+    if (!customer) {
+      // Create new customer user
+      customer = new User({
+        firstName,
+        lastName,
+        email,
+        phone,
+        role: 'customer',
+        password: Math.random().toString(36).slice(-8), // Random password
+        isActive: true
+      });
+      await customer.save();
+    }
+
+    // Check if customer is already a member of this gym
+    const existingMember = await Member.findOne({
+      user: customer._id,
+      gym: gymId
+    });
+
+    if (existingMember) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer is already a member of this gym'
+      });
+    }
+
+    // Parse arrays if they come as strings (from FormData)
+    const parsedFitnessGoals = fitnessGoals ? 
+      (typeof fitnessGoals === 'string' ? JSON.parse(fitnessGoals) : fitnessGoals) : [];
+    const parsedHealthConditions = healthConditions ? 
+      (typeof healthConditions === 'string' ? JSON.parse(healthConditions) : healthConditions) : [];
+    const parsedEmergencyContact = emergencyContact ? 
+      (typeof emergencyContact === 'string' ? JSON.parse(emergencyContact) : emergencyContact) : null;
+
+    // Debug payment method
+    console.log('DEBUG - Registration payment method:', paymentMethod);
+    console.log('DEBUG - Payment method type:', typeof paymentMethod);
+    console.log('DEBUG - Payment method exact value:', JSON.stringify(paymentMethod));
+    console.log('DEBUG - Is bank transfer?', paymentMethod === 'bank_transfer');
+    console.log('DEBUG - Req.body full:', req.body);
+    
+    // Upload receipt to Cloudinary if file is provided
+    let receiptUrl = null;
+    if (req.file && paymentMethod === 'bank_transfer') {
+      try {
+        console.log('DEBUG - Uploading receipt to Cloudinary...');
+        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, receiptOptions);
+        receiptUrl = cloudinaryResult.secure_url;
+        console.log('DEBUG - Receipt uploaded to Cloudinary:', receiptUrl);
+      } catch (uploadError) {
+        console.error('Error uploading receipt to Cloudinary:', uploadError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to upload receipt. Please try again.',
+          error: uploadError.message
+        });
+      }
+    }
+
+    // Create member record with all required fields
+    const member = new Member({
+      user: customer._id,
+      gym: gymId,
+      firstName,
+      lastName,
+      email,
+      phoneNumber: phone,
+      gender,
+      dateOfBirth: new Date(dateOfBirth),
+      membershipPlan: {
+        name: plan,
+        price: 1000, // Default price, will be updated based on gym's pricing
+        features: ['Basic access'],
+        startDate: new Date()
+      },
+      bodyMeasurements: {
+        height: parseFloat(height),
+        weight: parseFloat(weight),
+        bmi: parseFloat(bmi),
+        bodyFat: bodyFat ? parseFloat(bodyFat) : undefined,
+        waist: parseFloat(waist),
+        hips: hips ? parseFloat(hips) : undefined,
+        biceps: biceps ? parseFloat(biceps) : undefined,
+        thighs: thighs ? parseFloat(thighs) : undefined
+      },
+      fitnessGoals: parsedFitnessGoals,
+      emergencyContact: parsedEmergencyContact,
+      medicalInfo: {
+        conditions: parsedHealthConditions
+      },
+      paymentDetails: {
+        method: paymentMethod === 'bank_transfer' ? 'manual' : 'card',
+        paymentStatus: paymentMethod === 'bank_transfer' ? 'pending' : 'paid',
+        receiptPath: receiptUrl
+      },
+      status: paymentMethod === 'bank_transfer' ? 'inactive' : 'active',
+      createdBy: gym.owner._id
+    });
+    
+    // Extra debug before save
+    console.log('DEBUG - Member object before save:');
+    console.log('  status:', member.status);
+    console.log('  paymentDetails.method:', member.paymentDetails.method);
+    console.log('  paymentDetails.paymentStatus:', member.paymentDetails.paymentStatus);
+
+    console.log('DEBUG - Member before save:', {
+      status: member.status,
+      paymentStatus: member.paymentDetails.paymentStatus,
+      paymentMethod: member.paymentDetails.method
+    });
+
+    await member.save();
+
+    // Create notifications
+    try {
+      // Notification for customer
+      await NotificationService.createNotification({
+        recipient: customer._id,
+        type: 'member_joined_gym',
+        title: `Welcome to ${gym.gymName}!`,
+        message: `Your membership registration at ${gym.gymName} has been ${paymentMethod === 'bank_transfer' ? 'submitted and is pending approval' : 'completed successfully'}.`,
+        data: {
+          gymId: gym._id,
+          gymName: gym.gymName,
+          memberId: member._id,
+          paymentMethod,
+          status: member.status
+        }
+      });
+
+      // Notification for gym owner
+      const gymOwnerMessage = paymentMethod === 'bank_transfer' 
+        ? `${firstName} ${lastName} has registered as a new member at your gym ${gym.gymName} via bank transfer. Please verify the payment receipt and approve the membership.`
+        : `${firstName} ${lastName} has registered as a new member at your gym ${gym.gymName}.`;
+      
+      const gymOwnerTitle = paymentMethod === 'bank_transfer' 
+        ? 'New Member Registration - Payment Verification Required'
+        : 'New Member Registration';
+
+      await NotificationService.createNotification({
+        recipient: gym.owner._id,
+        type: paymentMethod === 'bank_transfer' ? 'payment_received' : 'member_joined_gym',
+        title: gymOwnerTitle,
+        message: gymOwnerMessage,
+        priority: paymentMethod === 'bank_transfer' ? 'high' : 'medium',
+        data: {
+          gymId: gym._id,
+          gymName: gym.gymName,
+          memberId: member._id,
+          customerName: `${firstName} ${lastName}`,
+          customerEmail: email,
+          paymentMethod,
+          status: member.status,
+          receiptPath: receiptUrl,
+          requiresVerification: paymentMethod === 'bank_transfer'
+        }
+      });
+
+      console.log('Notifications created successfully for customer and gym owner');
+    } catch (notificationError) {
+      console.error('Error creating notifications:', notificationError);
+      // Don't fail the registration if notifications fail
+    }
+
+    console.log('DEBUG - Final member status:', member.status);
+    console.log('DEBUG - Final payment status:', member.paymentDetails.paymentStatus);
+    console.log('DEBUG - Payment method check:', paymentMethod === 'bank_transfer');
+    
+    res.status(201).json({
+      success: true,
+      message: paymentMethod === 'bank_transfer' 
+        ? 'Registration submitted successfully! Your membership is pending approval after payment verification.'
+        : 'Registration completed successfully! Welcome to the gym!',
+      data: {
+        member,
+        customer: {
+          id: customer._id,
+          name: `${customer.firstName} ${customer.lastName}`,
+          email: customer.email
+        },
+        gym: {
+          id: gym._id,
+          name: gym.gymName
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error registering customer to gym:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to register customer to gym',
+      error: error.message
+    });
+  }
+};
+
+// Confirm customer payment (for gym owners)
+export const confirmCustomerPayment = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const gymOwnerId = req.user.id;
+
+    // Find the gym owned by this user
+    const gym = await Gym.findOne({ owner: gymOwnerId, status: 'approved' });
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'No approved gym found for this owner'
+      });
+    }
+
+    // Find the member
+    const member = await Member.findOne({ 
+      _id: memberId, 
+      gym: gym._id 
+    }).populate('user', 'firstName lastName email');
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found'
+      });
+    }
+
+    // Update member status to active and payment status to paid
+    member.status = 'active';
+    member.paymentDetails.paymentStatus = 'paid';
+    await member.save();
+
+    // Send notification to customer
+    try {
+      await NotificationService.createNotification({
+        recipient: member.user._id,
+        type: 'payment_received',
+        title: 'Payment Confirmed!',
+        message: `Your payment has been verified and approved by ${gym.gymName}. Your membership is now active. Welcome to the gym!`,
+        priority: 'high',
+        data: {
+          gymId: gym._id,
+          gymName: gym.gymName,
+          memberId: member._id,
+          status: 'confirmed',
+          membershipStatus: 'active'
+        }
+      });
+
+      console.log('Payment confirmation notification sent to customer');
+    } catch (notificationError) {
+      console.error('Error creating payment confirmation notification:', notificationError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment confirmed successfully. Customer has been notified.',
+      data: {
+        member,
+        gym: {
+          id: gym._id,
+          name: gym.gymName
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error confirming customer payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to confirm payment',
       error: error.message
     });
   }

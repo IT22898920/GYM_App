@@ -50,7 +50,7 @@ function RegisterGym() {
     paymentProcessor: "",
     logo: null,
     photos: [],
-    location: { lat: 37.7749, lng: -122.4194 },
+    location: { lat: 6.9271, lng: 79.8612 }, // Colombo, Sri Lanka coordinates
     termsAccepted: false,
     privacyAccepted: false,
     paymentMethod: "", // Added for registration fee payment method

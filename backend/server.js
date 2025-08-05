@@ -1,4 +1,4 @@
-import express from 'express';
+import express from 'express'; // Restart trigger
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -14,6 +14,7 @@ import gymRequestRoutes from './routes/gymRequestRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import callRoutes from './routes/callRoutes.js';
 import memberRoutes from './routes/memberRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -66,6 +67,7 @@ app.use('/api/gym-requests', gymRequestRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/members', memberRoutes);
+app.use('/api/users', userRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

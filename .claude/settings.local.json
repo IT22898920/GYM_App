@@ -18,7 +18,11 @@
       "Bash(npx:*)",
       "Bash(/dev/null)",
       "Bash(grep:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(npm start)",
+      "Bash(ss:*)",
+      "Bash(touch:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }

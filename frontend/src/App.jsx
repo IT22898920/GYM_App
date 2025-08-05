@@ -53,6 +53,7 @@ import ManageImages from "./pages/gymowner/ManageImages";
 import UpdateLocation from "./pages/gymowner/UpdateLocation";
 import ContactInfo from "./pages/gymowner/ContactInfo";
 import GymOwnerMessages from "./pages/gymowner/Messages";
+import BankAccount from "./pages/gymowner/BankAccount";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -156,6 +157,7 @@ function AppContent() {
           <Route path="update-location" element={<UpdateLocation />} />
           <Route path="contact-info" element={<ContactInfo />} />
           <Route path="messages" element={<GymOwnerMessages />} />
+          <Route path="bank-account" element={<BankAccount />} />
 
           <Route
             path="verify-reject-instructor"

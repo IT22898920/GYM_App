@@ -245,7 +245,25 @@ const mapDurationToAPI = (displayDuration) => {
 
 // Helper function to format gym data for API
 export const formatGymDataForAPI = (formData) => {
-  return {
+  // Ensure location exists and has valid coordinates
+  if (!formData.location || !formData.location.lat || !formData.location.lng) {
+    throw new Error('Location coordinates are required. Please set your gym location on the map.');
+  }
+
+  const lng = parseFloat(formData.location.lng);
+  const lat = parseFloat(formData.location.lat);
+  
+  // Check if parsing resulted in valid numbers
+  if (isNaN(lng) || isNaN(lat)) {
+    throw new Error('Invalid location coordinates. Please set a valid location on the map.');
+  }
+  
+  const coordinates = [lng, lat];
+  console.log('DEBUG - Coordinates being sent:', coordinates);
+  console.log('DEBUG - Coordinates types:', typeof coordinates[0], typeof coordinates[1]);
+  console.log('DEBUG - Original location data:', formData.location);
+
+  const apiData = {
     gymName: formData.gymName,
     description: formData.gymType || formData.description, // Using gymType as description if no description provided
     contactInfo: {
@@ -260,10 +278,7 @@ export const formatGymDataForAPI = (formData) => {
       zipCode: formData.zipCode,
       country: 'Sri Lanka' // Default country
     },
-    location: {
-      type: 'Point',
-      coordinates: [formData.location.lng, formData.location.lat] // [longitude, latitude]
-    },
+    coordinates: coordinates, // [longitude, latitude]
     facilities: formData.facilities || [],
     services: formData.classTypes || [], // Using classTypes as services
     pricing: {
@@ -285,6 +300,8 @@ export const formatGymDataForAPI = (formData) => {
     },
     tags: [formData.gymType] // Using gymType as tag
   };
+  
+  return apiData;
 };
 
 // Helper function to validate URL

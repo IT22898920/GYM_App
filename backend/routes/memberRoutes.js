@@ -8,11 +8,17 @@ import {
   assignInstructor,
   deleteMember,
   updateMemberStatus,
-  getMemberStats
+  getMemberStats,
+  registerCustomerToGym,
+  uploadReceipt,
+  confirmCustomerPayment
 } from '../controllers/memberController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Public route for customer registration
+router.post('/register/:gymId', uploadReceipt, registerCustomerToGym);
 
 // All routes require authentication and gym owner authorization
 router.use(protect);
@@ -34,5 +40,6 @@ router.delete('/:memberId', deleteMember);
 // Member specific operations
 router.put('/:memberId/assign-instructor', assignInstructor);
 router.patch('/:memberId/status', updateMemberStatus);
+router.patch('/:memberId/confirm-payment', confirmCustomerPayment);
 
 export default router;

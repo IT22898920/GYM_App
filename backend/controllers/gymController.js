@@ -4,6 +4,7 @@ import InstructorApplication from '../models/InstructorApplication.js';
 import { sendGymApprovalEmail, sendGymRejectionEmail, sendGymPendingEmail } from '../utils/emailService.js';
 import { deleteFromCloudinary } from '../config/cloudinary.js';
 import NotificationService from '../services/notificationService.js';
+import bcrypt from 'bcryptjs';
 
 // Upload gym logo
 export const uploadGymLogo = async (req, res) => {
@@ -49,7 +50,7 @@ export const uploadGymLogo = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Logo uploaded successfully to Cloudinary',
+      message: 'Logo uploaded successfully',
       data: {
         logo: gym.logo
       }
@@ -59,14 +60,14 @@ export const uploadGymLogo = async (req, res) => {
     console.error('Error uploading gym logo:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to upload logo',
+      message: 'Failed to upload gym logo',
       error: error.message
     });
   }
 };
 
 // Upload gym images
-export const uploadImages = async (req, res) => {
+export const uploadGymImages = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -94,28 +95,27 @@ export const uploadImages = async (req, res) => {
       });
     }
 
-    // Format images for database storage
-    const images = req.uploadedImages.map((uploadedImage, index) => ({
-      url: uploadedImage.url,
-      publicId: uploadedImage.publicId,
-      caption: req.body.captions ? req.body.captions[index] || '' : '',
-      isPrimary: index === 0, // First image is primary by default
-      originalName: uploadedImage.originalName,
-      size: uploadedImage.size,
-      format: uploadedImage.format,
-      width: uploadedImage.width,
-      height: uploadedImage.height
+    // Add uploaded images to gym
+    const newImages = req.uploadedImages.map((image, index) => ({
+      url: image.url,
+      publicId: image.publicId,
+      caption: req.body.captions ? req.body.captions[index] : '',
+      isPrimary: gym.images.length === 0 && index === 0, // Make first image primary if no images exist
+      originalName: image.originalName,
+      size: image.size,
+      format: image.format,
+      width: image.width,
+      height: image.height
     }));
 
-    // Add new images to existing ones
-    gym.images.push(...images);
+    gym.images.push(...newImages);
     await gym.save();
 
     res.status(200).json({
       success: true,
-      message: 'Images uploaded successfully to Cloudinary',
+      message: 'Images uploaded successfully',
       data: {
-        uploadedImages: images,
+        images: newImages,
         totalImages: gym.images.length
       }
     });
@@ -124,70 +124,49 @@ export const uploadImages = async (req, res) => {
     console.error('Error uploading gym images:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to upload images',
+      message: 'Failed to upload gym images',
       error: error.message
     });
   }
 };
 
-// Register a new gym
-export const registerGym = async (req, res) => {
+// Create a new gym
+export const createGym = async (req, res) => {
   try {
+    console.log('DEBUG - Full request body:', JSON.stringify(req.body, null, 2));
+    console.log('DEBUG - Coordinates in body:', req.body.coordinates);
+    console.log('DEBUG - Coordinates type:', typeof req.body.coordinates);
+    console.log('DEBUG - Is array?', Array.isArray(req.body.coordinates));
+    
     const {
       gymName,
       description,
       contactInfo,
       address,
-      location,
+      coordinates,
       facilities,
-      equipment,
       services,
       operatingHours,
-      pricing,
-      amenities,
-      specialPrograms,
       capacity,
       establishedYear,
-      certifications,
-      socialMedia,
       tags
     } = req.body;
 
+    // Ensure user is a gym owner or admin
+    if (!req.user || (req.user.role !== 'gymOwner' && req.user.role !== 'admin' && req.user.role !== 'customer')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only gym owners can create gyms'
+      });
+    }
+
     // Check if gym with same name already exists
-    const existingGym = await Gym.findOne({ gymName: { $regex: new RegExp(gymName, 'i') } });
+    const existingGym = await Gym.findOne({ gymName });
     if (existingGym) {
       return res.status(400).json({
         success: false,
         message: 'A gym with this name already exists'
       });
-    }
-
-    // Verify the owner exists and is a gym owner
-    const owner = await User.findById(req.user.id);
-    if (!owner) {
-      return res.status(404).json({
-        success: false,
-        message: 'Owner not found'
-      });
-    }
-
-    // Allow customers to register their first gym
-    if (owner.role !== 'customer' && owner.role !== 'gymOwner' && owner.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not authorized to register a gym'
-      });
-    }
-
-    // Check if user already has a gym (only customers can register one gym)
-    if (owner.role === 'customer') {
-      const ownerHasGym = await Gym.findOne({ owner: req.user.id });
-      if (ownerHasGym) {
-        return res.status(400).json({
-          success: false,
-          message: 'You already have a gym registration pending. Please wait for admin approval.'
-        });
-      }
     }
 
     // Create new gym
@@ -197,221 +176,127 @@ export const registerGym = async (req, res) => {
       owner: req.user.id,
       contactInfo,
       address,
-      location,
-      facilities: facilities || [],
-      equipment: equipment || [],
-      services: services || [],
-      operatingHours: operatingHours || {},
-      pricing: pricing || {},
-      amenities: amenities || [],
-      specialPrograms: specialPrograms || [],
+      location: {
+        type: 'Point',
+        coordinates: coordinates // [longitude, latitude]
+      },
+      facilities,
+      services,
+      operatingHours,
       capacity,
       establishedYear,
-      certifications: certifications || [],
-      socialMedia: socialMedia || {},
-      tags: tags || []
+      tags,
+      status: 'pending',
+      verificationStatus: 'pending',
+      isActive: false // Will be activated after approval
     });
 
     const savedGym = await newGym.save();
 
-    // Populate owner information
-    const populatedGym = await Gym.findById(savedGym._id).populate('owner', 'firstName lastName email');
-
-    // Send confirmation email to gym owner
+    // If user is a customer, don't change their role yet - will change after approval
+    // Send notification email to admin
     try {
-      await sendGymPendingEmail(
-        owner.email,
-        gymName,
-        `${owner.firstName} ${owner.lastName}`
-      );
+      await sendGymPendingEmail(req.user.email, gymName);
     } catch (emailError) {
-      console.error('Error sending confirmation email:', emailError);
-      // Don't fail the registration if email fails
-    }
-
-    // Send registration confirmation notification to gym owner
-    try {
-      await NotificationService.createNotification({
-        recipient: req.user.id,
-        type: 'gym_registration_submitted',
-        title: 'Gym Registration Submitted 📋',
-        message: `Your gym "${gymName}" has been successfully registered and is now pending admin approval. We will notify you once it's reviewed.`,
-        data: { 
-          gymId: savedGym._id,
-          gymName: gymName,
-          status: 'pending'
-        },
-        link: '/gym-owner/dashboard',
-        priority: 'medium'
-      });
-      console.log('✅ Gym registration notification sent to owner:', owner.email);
-    } catch (notificationError) {
-      console.error('❌ Error sending gym registration notification:', notificationError);
-    }
-
-    // Send notification to all admins about new gym registration
-    try {
-      const adminUsers = await User.find({ role: 'admin', isActive: true }).select('_id');
-      if (adminUsers.length > 0) {
-        await NotificationService.createBulkNotifications({
-          recipients: adminUsers.map(admin => admin._id),
-          type: 'new_gym_registration',
-          title: 'New Gym Registration Pending 🏢',
-          message: `New gym "${gymName}" registered by ${owner.firstName} ${owner.lastName}. Review required for approval.`,
-          data: { 
-            gymId: savedGym._id,
-            gymName: gymName,
-            ownerName: `${owner.firstName} ${owner.lastName}`,
-            ownerEmail: owner.email
-          },
-          link: '/admin/gym-registrations',
-          priority: 'high'
-        });
-        console.log('✅ New gym registration notifications sent to', adminUsers.length, 'admins');
-      }
-    } catch (notificationError) {
-      console.error('❌ Error sending admin notifications:', notificationError);
+      console.error('Error sending gym pending email:', emailError);
+      // Don't fail the request if email fails
     }
 
     res.status(201).json({
       success: true,
-      message: 'Gym registered successfully. Awaiting admin approval.',
-      data: populatedGym
+      message: 'Gym registration submitted successfully. Awaiting admin approval.',
+      data: savedGym
     });
 
   } catch (error) {
-    console.error('Error registering gym:', error);
+    console.error('Error creating gym:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to register gym',
+      message: 'Failed to create gym',
       error: error.message
     });
   }
 };
 
-// Get all gyms with optional filters
+// Get all gyms (public)
 export const getAllGyms = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
+    const { 
+      page = 1, 
+      limit = 10, 
       search,
       city,
-      state,
-      status,
-      verified,
-      latitude,
-      longitude,
-      radius = 50, // Default radius in kilometers
-      facilities,
       services,
-      priceRange
+      facilities,
+      status,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
     } = req.query;
 
-    const filter = {};
+    // Build query
+    const query = {};
     
-    // Status filter
-    if (status) {
-      filter.status = status;
-    } else if (!req.user || req.user.role !== 'admin') {
-      // Only show approved gyms by default for non-admin users
-      filter.status = 'approved';
+    // Only show approved gyms to non-admin users
+    if (!req.user || req.user.role !== 'admin') {
+      query.status = 'approved';
+      query.isActive = true;
+    } else if (status) {
+      // Admin with specific status filter
+      query.status = status;
     }
-    // Admin users can see all gyms without status filter
-    
-    // Debug logging
-    console.log('getAllGyms - User role:', req.user?.role || 'No user');
-    console.log('getAllGyms - Filter applied:', filter);
+    // Admin without status parameter gets all gyms (no status filter)
 
-    // Verification filter
-    if (verified) {
-      filter.verificationStatus = verified;
-    }
-
-    // Location filters
-    if (city) {
-      filter['address.city'] = { $regex: new RegExp(city, 'i') };
-    }
-    if (state) {
-      filter['address.state'] = { $regex: new RegExp(state, 'i') };
-    }
-
-    // Facilities filter
-    if (facilities) {
-      const facilitiesArray = Array.isArray(facilities) ? facilities : [facilities];
-      filter.facilities = { $in: facilitiesArray };
-    }
-
-    // Services filter
-    if (services) {
-      const servicesArray = Array.isArray(services) ? services : [services];
-      filter.services = { $in: servicesArray };
-    }
-
-    let query = Gym.find(filter).populate('owner', 'firstName lastName email role');
-
-    // Text search
+    // Search functionality
     if (search) {
-      query = Gym.find({
-        ...filter,
-        $text: { $search: search }
-      }).populate('owner', 'firstName lastName email role');
+      query.$or = [
+        { gymName: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { 'address.city': { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } }
+      ];
     }
 
-    // Location-based search
-    if (latitude && longitude) {
-      const lat = parseFloat(latitude);
-      const lng = parseFloat(longitude);
-      const radiusInMeters = parseFloat(radius) * 1000; // Convert km to meters
-
-      // Use $geoWithin with $centerSphere instead of $near to avoid sorting issues
-      query = Gym.find({
-        ...filter,
-        location: {
-          $geoWithin: {
-            $centerSphere: [[lng, lat], radiusInMeters / 6378100] // Convert to radians
-          }
-        }
-      }).populate('owner', 'firstName lastName email role');
+    // Filter by city
+    if (city) {
+      query['address.city'] = { $regex: city, $options: 'i' };
     }
 
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const gyms = await query
+    // Filter by services
+    if (services) {
+      const serviceArray = services.split(',');
+      query.services = { $in: serviceArray };
+    }
+
+    // Filter by facilities
+    if (facilities) {
+      const facilityArray = facilities.split(',');
+      query.facilities = { $in: facilityArray };
+    }
+
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
+
+    // Sort options
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Execute query
+    const gyms = await Gym.find(query)
+      .populate('owner', 'firstName lastName email')
+      .sort(sortOptions)
       .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+      .limit(parseInt(limit));
 
     // Get total count for pagination
-    let total;
-    if (search) {
-      total = await Gym.countDocuments({
-        ...filter,
-        $text: { $search: search }
-      });
-    } else if (latitude && longitude) {
-      const lat = parseFloat(latitude);
-      const lng = parseFloat(longitude);
-      const radiusInMeters = parseFloat(radius) * 1000;
-      total = await Gym.countDocuments({
-        ...filter,
-        location: {
-          $geoWithin: {
-            $centerSphere: [[lng, lat], radiusInMeters / 6378100] // Convert to radians
-          }
-        }
-      });
-    } else {
-      total = await Gym.countDocuments(filter);
-    }
+    const totalGyms = await Gym.countDocuments(query);
 
     res.status(200).json({
       success: true,
       data: gyms,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(total / parseInt(limit)),
-        totalItems: total,
+        totalPages: Math.ceil(totalGyms / limit),
+        totalItems: totalGyms,
         itemsPerPage: parseInt(limit)
       }
     });
@@ -426,14 +311,27 @@ export const getAllGyms = async (req, res) => {
   }
 };
 
-// Get gym by ID
+// Get gym by ID (public)
 export const getGymById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const gym = await Gym.findById(id).populate('owner', 'firstName lastName email phone');
+    const gym = await Gym.findById(id)
+      .populate('owner', 'firstName lastName email')
+      .populate({
+        path: 'instructors.instructor',
+        select: 'firstName lastName email specialization'
+      });
 
     if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Only show approved gyms to non-admin users
+    if ((!req.user || req.user.role !== 'admin') && gym.status !== 'approved') {
       return res.status(404).json({
         success: false,
         message: 'Gym not found'
@@ -455,10 +353,11 @@ export const getGymById = async (req, res) => {
   }
 };
 
-// Update gym (owner only)
+// Update gym (owner or admin only)
 export const updateGym = async (req, res) => {
   try {
     const { id } = req.params;
+    const updateData = req.body;
 
     const gym = await Gym.findById(id);
     if (!gym) {
@@ -476,9 +375,23 @@ export const updateGym = async (req, res) => {
       });
     }
 
+    // Don't allow status updates through this endpoint
+    delete updateData.status;
+    delete updateData.verificationStatus;
+    delete updateData.owner;
+
+    // Update location if coordinates provided
+    if (updateData.coordinates) {
+      updateData.location = {
+        type: 'Point',
+        coordinates: updateData.coordinates
+      };
+      delete updateData.coordinates;
+    }
+
     const updatedGym = await Gym.findByIdAndUpdate(
       id,
-      { ...req.body, updatedAt: Date.now() },
+      { ...updateData, updatedAt: Date.now() },
       { new: true, runValidators: true }
     ).populate('owner', 'firstName lastName email');
 
@@ -601,71 +514,33 @@ export const approveGym = async (req, res) => {
         { role: 'gymOwner' },
         { new: true }
       );
-      console.log(`Updated user ${gym.owner.email} role from customer to gymOwner`);
+      
+      console.log('🏢 Updated user role from customer to gymOwner');
     }
 
-    // Send approval email to gym owner
+    // Send approval notification
     try {
-      await sendGymApprovalEmail(
-        gym.owner.email,
-        gym.gymName,
-        `${gym.owner.firstName} ${gym.owner.lastName}`
-      );
+      await NotificationService.createGymNotification(gym._id, 'approved', req.user.id);
+    } catch (notifError) {
+      console.error('Error creating notification:', notifError);
+    }
+
+    // Send approval email
+    try {
+      await sendGymApprovalEmail(gym.owner.email, gym.gymName);
     } catch (emailError) {
       console.error('Error sending approval email:', emailError);
-      // Don't fail the approval if email fails
     }
 
-    // Send approval notification to gym owner
-    try {
-      await NotificationService.createNotification({
-        recipient: gym.owner._id,
-        type: 'gym_registration_approved',
-        title: 'Gym Registration Approved! 🎉',
-        message: `Congratulations! Your gym "${gym.gymName}" has been approved and is now live on our platform. You can start managing your gym and accepting members.`,
-        data: { 
-          gymId: gym._id,
-          gymName: gym.gymName,
-          adminNotes: adminNotes
-        },
-        link: '/gym-owner/dashboard',
-        priority: 'high'
-      });
-      console.log('✅ Gym approval notification sent to:', gym.owner.email);
-    } catch (notificationError) {
-      console.error('❌ Error sending gym approval notification:', notificationError);
-    }
-
-    // Send confirmation notification to admin
-    try {
-      await NotificationService.createNotification({
-        recipient: req.user.id,
-        type: 'admin_action_completed',
-        title: 'Gym Approved Successfully ✅',
-        message: `You have successfully approved "${gym.gymName}" owned by ${gym.owner.firstName} ${gym.owner.lastName}. The gym is now active on the platform.`,
-        data: { 
-          actionType: 'gym_approval',
-          gymId: gym._id,
-          gymName: gym.gymName,
-          ownerName: `${gym.owner.firstName} ${gym.owner.lastName}`,
-          ownerEmail: gym.owner.email
-        },
-        link: '/admin/gym-registrations',
-        priority: 'medium'
-      });
-      console.log('✅ Admin confirmation notification sent for gym approval');
-    } catch (notificationError) {
-      console.error('❌ Error sending admin confirmation notification:', notificationError);
-    }
-
+    console.log('🏢 GYM APPROVED SUCCESSFULLY');
     res.status(200).json({
       success: true,
-      message: 'Gym approved successfully and owner role updated',
+      message: 'Gym approved successfully',
       data: gym
     });
 
   } catch (error) {
-    console.error('Error approving gym:', error);
+    console.error('🏢 Error approving gym:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to approve gym',
@@ -678,7 +553,7 @@ export const approveGym = async (req, res) => {
 export const rejectGym = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminNotes } = req.body;
+    const { adminNotes, reason } = req.body;
 
     if (req.user.role !== 'admin') {
       return res.status(403).json({
@@ -692,7 +567,8 @@ export const rejectGym = async (req, res) => {
       {
         status: 'rejected',
         verificationStatus: 'rejected',
-        adminNotes: adminNotes || 'Gym registration rejected',
+        adminNotes: adminNotes || reason || 'No reason provided',
+        isActive: false,
         updatedAt: Date.now()
       },
       { new: true }
@@ -705,61 +581,18 @@ export const rejectGym = async (req, res) => {
       });
     }
 
-    // Send rejection email to gym owner
+    // Send rejection notification
     try {
-      await sendGymRejectionEmail(
-        gym.owner.email,
-        gym.gymName,
-        `${gym.owner.firstName} ${gym.owner.lastName}`,
-        adminNotes
-      );
+      await NotificationService.createGymNotification(gym._id, 'rejected', req.user.id);
+    } catch (notifError) {
+      console.error('Error creating notification:', notifError);
+    }
+
+    // Send rejection email
+    try {
+      await sendGymRejectionEmail(gym.owner.email, gym.gymName, adminNotes || reason || 'No reason provided');
     } catch (emailError) {
       console.error('Error sending rejection email:', emailError);
-      // Don't fail the rejection if email fails
-    }
-
-    // Send rejection notification to gym owner
-    try {
-      await NotificationService.createNotification({
-        recipient: gym.owner._id,
-        type: 'gym_registration_rejected',
-        title: 'Gym Registration Update',
-        message: `Unfortunately, your gym registration for "${gym.gymName}" has been rejected. ${adminNotes ? `Reason: ${adminNotes}` : ''} You can contact support for more information or resubmit with the required changes.`,
-        data: { 
-          gymId: gym._id,
-          gymName: gym.gymName,
-          adminNotes: adminNotes,
-          rejectionReason: adminNotes
-        },
-        link: '/register-gym',
-        priority: 'high'
-      });
-      console.log('✅ Gym rejection notification sent to:', gym.owner.email);
-    } catch (notificationError) {
-      console.error('❌ Error sending gym rejection notification:', notificationError);
-    }
-
-    // Send confirmation notification to admin
-    try {
-      await NotificationService.createNotification({
-        recipient: req.user.id,
-        type: 'admin_action_completed',
-        title: 'Gym Rejected ❌',
-        message: `You have rejected the gym registration for "${gym.gymName}" by ${gym.owner.firstName} ${gym.owner.lastName}. ${adminNotes ? `Reason: ${adminNotes}` : ''}`,
-        data: { 
-          actionType: 'gym_rejection',
-          gymId: gym._id,
-          gymName: gym.gymName,
-          ownerName: `${gym.owner.firstName} ${gym.owner.lastName}`,
-          ownerEmail: gym.owner.email,
-          rejectionReason: adminNotes
-        },
-        link: '/admin/gym-registrations',
-        priority: 'medium'
-      });
-      console.log('✅ Admin confirmation notification sent for gym rejection');
-    } catch (notificationError) {
-      console.error('❌ Error sending admin confirmation notification:', notificationError);
     }
 
     res.status(200).json({
@@ -778,54 +611,115 @@ export const rejectGym = async (req, res) => {
   }
 };
 
-// Search gyms near location
-export const searchNearbyGyms = async (req, res) => {
+// Get gyms near location
+export const getGymsNearLocation = async (req, res) => {
   try {
-    const { latitude, longitude, radius = 10 } = req.query;
+    const { longitude, latitude, maxDistance = 10000 } = req.query; // maxDistance in meters
 
-    if (!latitude || !longitude) {
+    if (!longitude || !latitude) {
       return res.status(400).json({
         success: false,
-        message: 'Latitude and longitude are required'
+        message: 'Longitude and latitude are required'
       });
     }
 
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-    const radiusInMeters = parseFloat(radius) * 1000;
-
     const gyms = await Gym.find({
       status: 'approved',
+      isActive: true,
       location: {
         $near: {
           $geometry: {
             type: 'Point',
-            coordinates: [lng, lat]
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
           },
-          $maxDistance: radiusInMeters
+          $maxDistance: parseInt(maxDistance)
         }
       }
     }).populate('owner', 'firstName lastName email');
 
-    // Add distance to each gym
-    const gymsWithDistance = gyms.map(gym => {
-      const distance = gym.calculateDistance([lng, lat]);
-      return {
-        ...gym.toObject(),
-        distance: Math.round(distance * 100) / 100 // Round to 2 decimal places
-      };
-    });
-    
     res.status(200).json({
       success: true,
-      data: gymsWithDistance
+      data: gyms,
+      count: gyms.length
     });
-// 
+
   } catch (error) {
-    console.error('Error searching nearby gyms:', error);
+    console.error('Error fetching nearby gyms:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to search nearby gyms',
+      message: 'Failed to fetch nearby gyms',
+      error: error.message
+    });
+  }
+};
+
+// Admin: Get all pending gyms
+export const getPendingGyms = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can view pending gyms'
+      });
+    }
+
+    const pendingGyms = await Gym.find({ status: 'pending' })
+      .populate('owner', 'firstName lastName email phone')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: pendingGyms,
+      count: pendingGyms.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching pending gyms:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch pending gyms',
+      error: error.message
+    });
+  }
+};
+
+// Toggle gym active status (owner or admin)
+export const toggleGymStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this gym'
+      });
+    }
+
+    gym.isActive = !gym.isActive;
+    await gym.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Gym ${gym.isActive ? 'activated' : 'deactivated'} successfully`,
+      data: {
+        isActive: gym.isActive
+      }
+    });
+
+  } catch (error) {
+    console.error('Error toggling gym status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle gym status',
       error: error.message
     });
   }
@@ -835,9 +729,15 @@ export const searchNearbyGyms = async (req, res) => {
 export const addInstructorToGym = async (req, res) => {
   try {
     const { gymId } = req.params;
-    const { instructorId, specialization, schedule } = req.body;
+    const {
+      instructorId,
+      specialization,
+      salary,
+      startDate,
+      description,
+      schedule
+    } = req.body;
 
-    // Find the gym
     const gym = await Gym.findById(gymId);
     if (!gym) {
       return res.status(404).json({
@@ -854,26 +754,12 @@ export const addInstructorToGym = async (req, res) => {
       });
     }
 
-    // Verify the instructor exists and is active
+    // Check if instructor exists and is an instructor
     const instructor = await User.findById(instructorId);
-    if (!instructor) {
+    if (!instructor || instructor.role !== 'instructor') {
       return res.status(404).json({
         success: false,
-        message: 'Instructor not found'
-      });
-    }
-
-    if (instructor.role !== 'instructor') {
-      return res.status(400).json({
-        success: false,
-        message: 'User is not a verified instructor'
-      });
-    }
-
-    if (!instructor.isActive) {
-      return res.status(400).json({
-        success: false,
-        message: 'Instructor is not active'
+        message: 'Instructor not found or user is not an instructor'
       });
     }
 
@@ -881,7 +767,6 @@ export const addInstructorToGym = async (req, res) => {
     const existingInstructor = gym.instructors.find(
       inst => inst.instructor.toString() === instructorId
     );
-
     if (existingInstructor) {
       return res.status(400).json({
         success: false,
@@ -892,21 +777,26 @@ export const addInstructorToGym = async (req, res) => {
     // Add instructor to gym
     gym.instructors.push({
       instructor: instructorId,
-      specialization: specialization || 'General Fitness',
-      schedule: schedule || [],
+      specialization,
+      salary,
+      startDate: startDate || Date.now(),
+      description,
+      schedule,
       isActive: true
     });
 
     await gym.save();
 
-    // Populate the new instructor data
-    const updatedGym = await Gym.findById(gymId)
-      .populate('instructors.instructor', 'firstName lastName email specialization');
+    // Populate the newly added instructor
+    await gym.populate({
+      path: 'instructors.instructor',
+      select: 'firstName lastName email specialization'
+    });
 
     res.status(200).json({
       success: true,
       message: 'Instructor added successfully',
-      data: updatedGym.instructors[updatedGym.instructors.length - 1]
+      data: gym.instructors[gym.instructors.length - 1]
     });
 
   } catch (error) {
@@ -941,17 +831,9 @@ export const removeInstructorFromGym = async (req, res) => {
     }
 
     // Remove instructor from gym
-    const initialLength = gym.instructors.length;
     gym.instructors = gym.instructors.filter(
       inst => inst.instructor.toString() !== instructorId
     );
-
-    if (gym.instructors.length === initialLength) {
-      return res.status(404).json({
-        success: false,
-        message: 'Instructor not found in this gym'
-      });
-    }
 
     await gym.save();
 
@@ -970,46 +852,12 @@ export const removeInstructorFromGym = async (req, res) => {
   }
 };
 
-// Get gym instructors
-export const getGymInstructors = async (req, res) => {
+// Update instructor in gym
+export const updateInstructorInGym = async (req, res) => {
   try {
-    const { gymId } = req.params;
+    const { gymId, instructorId } = req.params;
+    const updateData = req.body;
 
-    const gym = await Gym.findById(gymId)
-      .populate({
-        path: 'instructors.instructor',
-        select: 'firstName lastName email phone specialization experience isActive'
-      });
-
-    if (!gym) {
-      return res.status(404).json({
-        success: false,
-        message: 'Gym not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: gym.instructors
-    });
-
-  } catch (error) {
-    console.error('Error fetching gym instructors:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch gym instructors',
-      error: error.message
-    });
-  }
-};
-
-// Search available instructors (not in current gym)
-export const searchAvailableInstructors = async (req, res) => {
-  try {
-    const { gymId } = req.params;
-    const { search, specialization, page = 1, limit = 10 } = req.query;
-
-    // Get current gym to exclude its instructors
     const gym = await Gym.findById(gymId);
     if (!gym) {
       return res.status(404).json({
@@ -1018,83 +866,114 @@ export const searchAvailableInstructors = async (req, res) => {
       });
     }
 
-    // Get instructor IDs already in this gym
-    const gymInstructorIds = gym.instructors
-      .filter(inst => inst && inst.instructor) // Filter out null/undefined entries
-      .map(inst => inst.instructor.toString());
-
-    // Build search filter
-    const filter = {
-      role: 'instructor',
-      isActive: true,
-      _id: { $nin: gymInstructorIds } // Exclude instructors already in gym
-    };
-
-    if (search) {
-      filter.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ];
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update instructors in this gym'
+      });
     }
 
-    if (specialization) {
-      filter.specialization = { $in: [specialization] };
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const instructors = await User.find(filter)
-      .select('firstName lastName email phone specialization experience createdAt')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await User.countDocuments(filter);
-
-    // Get application data for each instructor
-    const instructorsWithDetails = await Promise.all(
-      instructors.map(async (instructor) => {
-        const application = await InstructorApplication.findOne({
-          applicant: instructor._id,
-          status: 'approved'
-        }).select('specialization experience profilePicture isFreelance preferredLocation');
-
-        return {
-          ...instructor.toObject(),
-          applicationDetails: application
-        };
-      })
+    // Find and update instructor
+    const instructorIndex = gym.instructors.findIndex(
+      inst => inst.instructor.toString() === instructorId
     );
 
-    res.status(200).json({
-      success: true,
-      data: instructorsWithDetails,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(total / parseInt(limit)),
-        totalItems: total,
-        itemsPerPage: parseInt(limit)
+    if (instructorIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor not found in this gym'
+      });
+    }
+
+    // Update instructor data
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] !== undefined && key !== 'instructor' && key !== 'addedAt') {
+        gym.instructors[instructorIndex][key] = updateData[key];
       }
     });
 
+    await gym.save();
+
+    // Populate the updated instructor
+    await gym.populate({
+      path: 'instructors.instructor',
+      select: 'firstName lastName email specialization'
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Instructor updated successfully',
+      data: gym.instructors[instructorIndex]
+    });
+
   } catch (error) {
-    console.error('Error searching available instructors:', error);
+    console.error('Error updating instructor in gym:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to search instructors',
+      message: 'Failed to update instructor in gym',
       error: error.message
     });
   }
 };
 
-// Register new instructor directly for a gym
-export const registerGymInstructor = async (req, res) => {
+// Get gym statistics (owner or admin)
+export const getGymStatistics = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view gym statistics'
+      });
+    }
+
+    // Calculate statistics
+    const stats = {
+      totalInstructors: gym.instructors.length,
+      activeInstructors: gym.instructors.filter(inst => inst.isActive).length,
+      totalServices: gym.services.length,
+      totalFacilities: gym.facilities.length,
+      totalImages: gym.images.length,
+      hasLogo: !!gym.logo,
+      membershipPlans: gym.pricing.membershipPlans.length,
+      rating: gym.rating.average,
+      totalReviews: gym.rating.totalReviews,
+      establishedSince: gym.establishedYear ? new Date().getFullYear() - gym.establishedYear : null
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+
+  } catch (error) {
+    console.error('Error fetching gym statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch gym statistics',
+      error: error.message
+    });
+  }
+};
+
+// Register a new instructor for a gym (Gym Owner only)
+export const registerInstructorForGym = async (req, res) => {
   try {
     const {
+      email,
       firstName,
       lastName,
-      email,
       phone,
       specialization,
       experience,
@@ -1125,117 +1004,87 @@ export const registerGymInstructor = async (req, res) => {
     if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to register instructors for this gym'
+        message: 'You are not authorized to add instructors to this gym'
       });
     }
 
-    // Check if user with this email already exists
+    // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'A user with this email already exists'
+        message: 'An account with this email already exists'
       });
     }
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     // Create new instructor user
     const newInstructor = new User({
+      email,
       firstName,
       lastName,
-      email,
       phone,
-      password, // Will be hashed by pre-save middleware
+      password: hashedPassword,
       role: 'instructor',
-      specialization: [specialization],
-      experience: parseInt(experience),
-      isActive: true
+      specialization,
+      experience,
+      isActive: true,
+      registeredBy: req.user.id
     });
 
     await newInstructor.save();
 
-    // Prepare instructor data for gym
-    const instructorGymData = {
+    // Add instructor to gym
+    gym.instructors.push({
       instructor: newInstructor._id,
       specialization,
-      salary: parseFloat(salary),
-      startDate: new Date(startDate),
-      description: description || '',
+      salary,
+      startDate: startDate || Date.now(),
+      description,
       isActive: true
-    };
-
-    // Add uploaded files if they exist
-    if (req.uploadedFiles) {
-      if (req.uploadedFiles.resume) {
-        instructorGymData.resume = req.uploadedFiles.resume;
-      }
-      if (req.uploadedFiles.certifications) {
-        instructorGymData.certifications = req.uploadedFiles.certifications;
-      }
-    }
-
-    // Add instructor to gym's instructors array
-    gym.instructors.push(instructorGymData);
+    });
 
     await gym.save();
 
-    // Send welcome notification to new instructor
+    // Create notification for the new instructor
     try {
-      await NotificationService.createNotification({
-        recipient: newInstructor._id,
-        sender: req.user.id,
-        type: 'instructor_added_to_gym',
-        title: 'Welcome to the Team! 🎉',
-        message: `You have been registered as an instructor at ${gym.gymName}. Welcome aboard! Your login credentials have been set up and you can start managing your classes.`,
-        data: { 
+      await NotificationService.createNotification(
+        newInstructor._id,
+        'instructor_registered',
+        `You have been registered as an instructor at ${gym.gymName}`,
+        {
           gymId: gym._id,
           gymName: gym.gymName,
-          position: specialization,
-          salary: salary,
-          startDate: startDate
-        },
-        link: '/instructor/dashboard',
-        priority: 'high'
-      });
-      console.log('✅ Welcome notification sent to new instructor:', email);
-    } catch (notificationError) {
-      console.error('❌ Error sending instructor welcome notification:', notificationError);
+          registeredBy: req.user.id
+        }
+      );
+    } catch (notifError) {
+      console.error('Error creating notification:', notifError);
     }
-
-    // Send confirmation notification to gym owner
-    try {
-      await NotificationService.createNotification({
-        recipient: req.user.id,
-        type: 'instructor_registration_completed',
-        title: 'Instructor Registered Successfully ✅',
-        message: `${firstName} ${lastName} has been successfully registered as a ${specialization} instructor for ${gym.gymName}. They can now access their instructor dashboard.`,
-        data: { 
-          instructorId: newInstructor._id,
-          instructorName: `${firstName} ${lastName}`,
-          instructorEmail: email,
-          gymId: gym._id,
-          gymName: gym.gymName,
-          specialization: specialization
-        },
-        link: '/gym-owner/instructors',
-        priority: 'medium'
-      });
-      console.log('✅ Instructor registration confirmation sent to gym owner');
-    } catch (notificationError) {
-      console.error('❌ Error sending gym owner confirmation notification:', notificationError);
-    }
-
-    // Return instructor info (without password)
-    const instructorResponse = await User.findById(newInstructor._id)
-      .select('-password -refreshToken -passwordResetToken -passwordResetExpires');
 
     res.status(201).json({
       success: true,
       message: 'Instructor registered successfully',
-      data: instructorResponse
+      data: {
+        instructor: {
+          id: newInstructor._id,
+          email: newInstructor.email,
+          firstName: newInstructor.firstName,
+          lastName: newInstructor.lastName,
+          role: newInstructor.role,
+          specialization: newInstructor.specialization
+        },
+        gym: {
+          id: gym._id,
+          name: gym.gymName
+        }
+      }
     });
 
   } catch (error) {
-    console.error('Error registering gym instructor:', error);
+    console.error('Error registering instructor:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to register instructor',
@@ -1244,14 +1093,18 @@ export const registerGymInstructor = async (req, res) => {
   }
 };
 
-// Update gym instructor details
-export const updateGymInstructor = async (req, res) => {
+// Get instructors for a specific gym
+export const getGymInstructors = async (req, res) => {
   try {
-    const { gymId, instructorId } = req.params;
-    const { specialization, salary, startDate, description, isActive, schedule } = req.body;
+    const { gymId } = req.params;
 
-    // Verify gym ownership
-    const gym = await Gym.findById(gymId);
+    const gym = await Gym.findById(gymId)
+      .select('instructors gymName owner')
+      .populate({
+        path: 'instructors.instructor',
+        select: 'firstName lastName email phone specialization experience isActive'
+      });
+
     if (!gym) {
       return res.status(404).json({
         success: false,
@@ -1259,191 +1112,306 @@ export const updateGymInstructor = async (req, res) => {
       });
     }
 
-    if (gym.owner.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not authorized to update instructors for this gym'
-      });
-    }
-
-    // Find the instructor in the gym's instructors array
-    const instructorIndex = gym.instructors.findIndex(
-      inst => inst._id.toString() === instructorId
-    );
-
-    if (instructorIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Instructor not found in this gym'
-      });
-    }
-
-    // Update instructor details
-    if (specialization !== undefined) gym.instructors[instructorIndex].specialization = specialization;
-    if (salary !== undefined) gym.instructors[instructorIndex].salary = salary;
-    if (startDate !== undefined) gym.instructors[instructorIndex].startDate = startDate;
-    if (description !== undefined) gym.instructors[instructorIndex].description = description;
-    if (isActive !== undefined) gym.instructors[instructorIndex].isActive = isActive;
-    if (schedule !== undefined) gym.instructors[instructorIndex].schedule = schedule;
-
-    // Save the updated gym
-    await gym.save();
-
-    // Get the updated instructor with populated data
-    const updatedGym = await Gym.findById(gymId)
-      .populate({
-        path: 'instructors.instructor',
-        select: 'firstName lastName email phone specialization experience isActive'
-      });
-
-    const updatedInstructor = updatedGym.instructors.find(
-      inst => inst._id.toString() === instructorId
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Instructor updated successfully',
-      data: updatedInstructor
-    });
-
-  } catch (error) {
-    console.error('Error updating gym instructor:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update instructor',
-      error: error.message
-    });
-  }
-};
-
-// Get gym statistics (admin only)
-export const getGymStats = async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only admins can access gym statistics'
-      });
-    }
-
-    const totalGyms = await Gym.countDocuments();
-    const approvedGyms = await Gym.countDocuments({ status: 'approved' });
-    const pendingGyms = await Gym.countDocuments({ status: 'pending' });
-    const rejectedGyms = await Gym.countDocuments({ status: 'rejected' });
-    const verifiedGyms = await Gym.countDocuments({ verificationStatus: 'verified' });
-
-    // Get gyms by location (top 5 cities)
-    const gymsByLocation = await Gym.aggregate([
-      { $match: { status: 'approved' } },
-      { $group: { _id: '$address.city', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 }
-    ]);
-
-    // Get recent registrations (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Check if user has permission to view instructors
+    const isOwner = gym.owner.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
     
-    const recentRegistrations = await Gym.countDocuments({
-      createdAt: { $gte: thirtyDaysAgo }
-    });
+    if (!isOwner && !isAdmin) {
+      // For non-owners, only return active instructors with limited info
+      const publicInstructors = gym.instructors
+        .filter(inst => inst.isActive)
+        .map(inst => ({
+          instructor: {
+            id: inst.instructor._id,
+            firstName: inst.instructor.firstName,
+            lastName: inst.instructor.lastName,
+            specialization: inst.instructor.specialization
+          },
+          schedule: inst.schedule
+        }));
 
-    // Get gym ratings distribution
-    const ratingDistribution = await Gym.aggregate([
-      { $match: { status: 'approved', 'rating.average': { $gt: 0 } } },
-      { $bucket: {
-        groupBy: '$rating.average',
-        boundaries: [0, 1, 2, 3, 4, 5],
-        default: 'No Rating',
-        output: { count: { $sum: 1 } }
-      }}
-    ]);
+      return res.status(200).json({
+        success: true,
+        data: publicInstructors
+      });
+    }
 
+    // For owners and admins, return full instructor info
     res.status(200).json({
       success: true,
-      data: {
-        overview: {
-          totalGyms,
-          approvedGyms,
-          pendingGyms,
-          rejectedGyms,
-          verifiedGyms,
-          recentRegistrations
-        },
-        gymsByLocation,
-        ratingDistribution
-      }
+      data: gym.instructors
     });
 
   } catch (error) {
-    console.error('Error fetching gym statistics:', error);
+    console.error('Error fetching gym instructors:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch gym statistics',
+      message: 'Error fetching gym instructors',
       error: error.message
     });
   }
 };
 
-// Get gym dashboard data (owner)
-export const getGymDashboard = async (req, res) => {
+// Update bank account details
+export const updateBankAccount = async (req, res) => {
   try {
-    const ownerId = req.user.id;
+    const { id } = req.params;
+    const bankAccountData = req.body;
 
-    // Get gym owned by the user
-    const gym = await Gym.findOne({ owner: ownerId });
-
+    const gym = await Gym.findById(id);
     if (!gym) {
       return res.status(404).json({
         success: false,
-        message: 'No gym found for this owner'
+        message: 'Gym not found'
       });
     }
 
-    // Calculate basic statistics
-    const stats = {
-      status: gym.status,
-      verificationStatus: gym.verificationStatus,
-      totalImages: gym.images.length,
-      totalFacilities: gym.facilities.length,
-      totalServices: gym.services.length,
-      membershipPlans: gym.pricing.membershipPlans.length,
-      rating: gym.rating.average,
-      totalReviews: gym.rating.totalReviews
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update bank account for this gym'
+      });
+    }
+
+    // Update bank account details
+    gym.bankAccount = {
+      ...gym.bankAccount,
+      ...bankAccountData,
+      lastUpdated: Date.now()
     };
+
+    await gym.save();
+
+    // Return gym with masked account number
+    const gymResponse = gym.toObject();
+    if (gymResponse.bankAccount && gymResponse.bankAccount.accountNumber) {
+      // Mask account number for security
+      const accountNum = gymResponse.bankAccount.accountNumber;
+      gymResponse.bankAccount.accountNumber = accountNum.slice(0, 4) + '****' + accountNum.slice(-4);
+    }
 
     res.status(200).json({
       success: true,
-      data: {
-        gym,
-        stats
-      }
+      message: 'Bank account details updated successfully',
+      data: gymResponse
     });
-
   } catch (error) {
-    console.error('Error fetching gym dashboard:', error);
+    console.error('Error updating bank account:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch gym dashboard',
+      message: 'Error updating bank account details',
       error: error.message
     });
   }
 };
 
-// Delete individual gym image
+// Get bank account details
+export const getBankAccount = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const gym = await Gym.findById(id).select('bankAccount owner');
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view bank account details'
+      });
+    }
+
+    // Return bank account with masked account number
+    const bankAccount = gym.bankAccount || {};
+    if (bankAccount.accountNumber) {
+      const accountNum = bankAccount.accountNumber;
+      bankAccount.accountNumber = accountNum.slice(0, 4) + '****' + accountNum.slice(-4);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: bankAccount
+    });
+  } catch (error) {
+    console.error('Error fetching bank account:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching bank account details',
+      error: error.message
+    });
+  }
+};
+
+// Delete bank account details
+export const deleteBankAccount = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete bank account for this gym'
+      });
+    }
+
+    // Clear bank account details
+    gym.bankAccount = undefined;
+    await gym.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank account details deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting bank account:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting bank account details',
+      error: error.message
+    });
+  }
+};
+
+// Delete gym logo
+export const deleteGymLogo = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete logo for this gym'
+      });
+    }
+
+    if (!gym.logo || !gym.logo.publicId) {
+      return res.status(404).json({
+        success: false,
+        message: 'No logo found to delete'
+      });
+    }
+
+    // Delete from Cloudinary
+    try {
+      await deleteFromCloudinary(gym.logo.publicId);
+    } catch (cloudinaryError) {
+      console.error('Error deleting from Cloudinary:', cloudinaryError);
+      // Continue even if Cloudinary deletion fails
+    }
+
+    // Remove logo from database
+    gym.logo = undefined;
+    await gym.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Logo deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting gym logo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete gym logo',
+      error: error.message
+    });
+  }
+};
+
+// Set primary gym image
+export const setPrimaryGymImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { imageId } = req.body;
+
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    // Check if user is the owner or admin
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update images for this gym'
+      });
+    }
+
+    // Reset all images to non-primary
+    gym.images.forEach(img => {
+      img.isPrimary = false;
+    });
+
+    // Find and set the selected image as primary
+    const imageToUpdate = gym.images.find(img => 
+      img._id.toString() === imageId || img.publicId === imageId
+    );
+
+    if (!imageToUpdate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Image not found'
+      });
+    }
+
+    imageToUpdate.isPrimary = true;
+    await gym.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Primary image updated successfully',
+      data: {
+        primaryImage: imageToUpdate
+      }
+    });
+
+  } catch (error) {
+    console.error('Error setting primary gym image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to set primary gym image',
+      error: error.message
+    });
+  }
+};
+
+// Delete gym image
 export const deleteGymImage = async (req, res) => {
   try {
     const { id, imageId } = req.params;
-    // Decode the imageId in case it was URL encoded
-    const decodedImageId = decodeURIComponent(imageId);
-    
-    console.log('Delete image request:', {
-      gymId: id,
-      originalImageId: imageId,
-      decodedImageId: decodedImageId
-    });
+    console.log('Deleting gym image:', { gymId: id, imageId });
 
-    // Find the gym first to check permissions and get image details
+    // Decode the imageId in case it's URL encoded
+    const decodedImageId = decodeURIComponent(imageId);
+    console.log('Decoded imageId:', decodedImageId);
+
     const gym = await Gym.findById(id);
     if (!gym) {
       return res.status(404).json({
@@ -1460,36 +1428,38 @@ export const deleteGymImage = async (req, res) => {
       });
     }
 
-    // Find the image in the gym's images array
-    console.log('Gym images:', gym.images.map(img => ({
-      _id: img._id.toString(),
-      publicId: img.publicId
-    })));
+    // Find the image to delete
+    console.log('Current gym images:', gym.images.map(img => ({ _id: img._id.toString(), publicId: img.publicId })));
     
     const imageToDelete = gym.images.find(img => 
-      img.publicId === decodedImageId || img._id.toString() === decodedImageId
+      img._id.toString() === decodedImageId || img.publicId === decodedImageId
     );
 
-    console.log('Image to delete:', imageToDelete);
-
     if (!imageToDelete) {
+      console.log('Image not found with ID:', decodedImageId);
       return res.status(404).json({
         success: false,
         message: 'Image not found'
       });
     }
 
-    try {
-      // Delete from Cloudinary first
-      await deleteFromCloudinary(imageToDelete.publicId);
-    } catch (cloudinaryError) {
-      console.error('Error deleting from Cloudinary:', cloudinaryError);
-      // Continue with database deletion even if Cloudinary deletion fails
+    console.log('Found image to delete:', imageToDelete);
+
+    // Delete from Cloudinary
+    if (imageToDelete.publicId) {
+      try {
+        await deleteFromCloudinary(imageToDelete.publicId);
+        console.log('Deleted from Cloudinary:', imageToDelete.publicId);
+      } catch (cloudinaryError) {
+        console.error('Error deleting from Cloudinary:', cloudinaryError);
+        // Continue even if Cloudinary deletion fails
+      }
     }
 
-    // Use findByIdAndUpdate to avoid version conflicts
-    // Check if decodedImageId is a valid ObjectId format
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(decodedImageId);
+    // Remove image from database using Mongoose's pull method
+    // Check if decodedImageId is a valid ObjectId
+    const mongoose = await import('mongoose');
+    const isObjectId = mongoose.Types.ObjectId.isValid(decodedImageId);
     
     let updateQuery;
     if (isObjectId) {

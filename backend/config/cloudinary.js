@@ -46,6 +46,17 @@ export const profileImageOptions = {
   resource_type: 'image'
 };
 
+// Upload options for payment receipts
+export const receiptOptions = {
+  folder: 'gym-app/receipts',
+  allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
+  transformation: [
+    { quality: 'auto' },
+    { fetch_format: 'auto' }
+  ],
+  resource_type: 'auto' // Supports both images and PDFs
+};
+
 // Helper function to upload single image to Cloudinary
 export const uploadToCloudinary = async (buffer, options = gymImageOptions) => {
   return new Promise((resolve, reject) => {

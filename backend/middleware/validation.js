@@ -90,6 +90,11 @@ export const validateChangePassword = [
 
 // Gym registration validation
 export const validateGymRegistration = [
+  (req, res, next) => {
+    console.log('DEBUG - validateGymRegistration middleware called');
+    console.log('DEBUG - Request body in validation:', req.body);
+    next();
+  },
   body('gymName')
     .trim()
     .notEmpty().withMessage('Gym name is required')
@@ -142,7 +147,13 @@ export const validateGymRegistration = [
     .trim()
     .notEmpty().withMessage('Country cannot be empty'),
   
-  body('location.coordinates')
+  body('coordinates')
+    .custom((value, { req }) => {
+      console.log('DEBUG - Validating coordinates:', value);
+      console.log('DEBUG - Request body keys:', Object.keys(req.body));
+      console.log('DEBUG - Full request body:', req.body);
+      return true;
+    })
     .isArray({ min: 2, max: 2 }).withMessage('Location coordinates must be an array of [longitude, latitude]')
     .custom((value) => {
       const [lng, lat] = value;
@@ -337,4 +348,61 @@ export const validateGymUpdate = [
   body('certifications')
     .optional()
     .isArray().withMessage('Certifications must be an array')
+];
+
+// Bank account validation
+export const validateBankAccount = [
+  body('accountHolderName')
+    .trim()
+    .notEmpty().withMessage('Account holder name is required')
+    .isLength({ min: 2, max: 100 }).withMessage('Account holder name must be between 2 and 100 characters'),
+  
+  body('accountNumber')
+    .trim()
+    .notEmpty().withMessage('Account number is required')
+    .isLength({ min: 5, max: 30 }).withMessage('Account number must be between 5 and 30 characters')
+    .matches(/^[0-9]+$/).withMessage('Account number must contain only numbers'),
+  
+  body('bankName')
+    .trim()
+    .notEmpty().withMessage('Bank name is required')
+    .isLength({ min: 2, max: 100 }).withMessage('Bank name must be between 2 and 100 characters'),
+  
+  body('branchName')
+    .optional()
+    .trim()
+    .isLength({ max: 100 }).withMessage('Branch name cannot exceed 100 characters'),
+  
+  body('swiftCode')
+    .optional({ checkFalsy: true })
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/)) {
+        throw new Error('Please provide a valid SWIFT/BIC code');
+      }
+      return true;
+    }),
+  
+  body('iban')
+    .optional({ checkFalsy: true })
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0) {
+        if (!value.match(/^[A-Z0-9]+$/)) {
+          throw new Error('IBAN must contain only letters and numbers');
+        }
+        if (value.length < 15 || value.length > 34) {
+          throw new Error('IBAN must be between 15 and 34 characters');
+        }
+      }
+      return true;
+    }),
+  
+  body('currency')
+    .optional()
+    .isIn(['LKR', 'USD', 'EUR', 'GBP']).withMessage('Invalid currency code'),
+  
+  body('accountType')
+    .optional()
+    .isIn(['savings', 'current', 'business']).withMessage('Invalid account type')
 ];

@@ -82,6 +82,50 @@ const userSchema = new mongoose.Schema({
     establishedYear: Number,
     facilities: [String]
   },
+  bankAccount: {
+    accountHolderName: {
+      type: String,
+      trim: true
+    },
+    accountNumber: {
+      type: String,
+      trim: true
+    },
+    bankName: {
+      type: String,
+      trim: true
+    },
+    branchName: {
+      type: String,
+      trim: true
+    },
+    swiftCode: {
+      type: String,
+      trim: true
+    },
+    iban: {
+      type: String,
+      trim: true
+    },
+    currency: {
+      type: String,
+      default: 'LKR',
+      trim: true
+    },
+    accountType: {
+      type: String,
+      enum: ['savings', 'current', 'business'],
+      default: 'business'
+    },
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
+  },
   refreshToken: {
     type: String,
     select: false

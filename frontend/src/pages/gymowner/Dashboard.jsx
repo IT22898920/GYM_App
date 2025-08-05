@@ -208,6 +208,24 @@ function Dashboard() {
                 →
               </div>
             </Link>
+
+            <Link
+              to="/gym-owner/bank-account"
+              className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors group"
+            >
+              <div className="flex items-center">
+                <div className="p-2 bg-emerald-500/10 rounded-lg mr-3 group-hover:bg-emerald-500/20 transition-colors">
+                  <FiDollarSign className="h-5 w-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-medium">Bank Account</h3>
+                  <p className="text-gray-400 text-sm">Manage payment and bank details</p>
+                </div>
+              </div>
+              <div className="text-gray-400 group-hover:text-white transition-colors">
+                →
+              </div>
+            </Link>
           </div>
         </div>
 

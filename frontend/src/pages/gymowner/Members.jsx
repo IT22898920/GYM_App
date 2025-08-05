@@ -28,6 +28,9 @@ import {
   FiUserPlus,
   FiStar,
   FiUserCheck,
+  FiEye,
+  FiCreditCard,
+  FiAlertCircle,
 } from "react-icons/fi";
 
 function Members() {
@@ -37,7 +40,9 @@ function Members() {
   // 1. State for Members
   // -------------------------------
   const [members, setMembers] = useState([]);
+  const [pendingMembers, setPendingMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pendingLoading, setPendingLoading] = useState(true);
   const [stats, setStats] = useState({
     totalMembers: 0,
     activeMembers: 0,
@@ -55,6 +60,11 @@ function Members() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedInstructor, setSelectedInstructor] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [memberToConfirm, setMemberToConfirm] = useState(null);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -67,6 +77,7 @@ function Members() {
   useEffect(() => {
     fetchMembers();
     fetchMemberStats();
+    fetchPendingMembers();
   }, [currentPage, searchTerm, selectedFilter]);
 
   const fetchMembers = async () => {
@@ -117,6 +128,80 @@ function Members() {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
+  };
+
+  const fetchPendingMembers = async () => {
+    try {
+      setPendingLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/members?status=inactive&limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch pending members');
+      }
+
+      const data = await response.json();
+      
+      // Filter for members with pending payment status
+      const pending = data.data.filter(member => 
+        member.paymentDetails?.paymentStatus === 'pending' || 
+        (member.status === 'inactive' && member.paymentDetails?.method === 'manual')
+      );
+      setPendingMembers(pending);
+    } catch (error) {
+      console.error('Error fetching pending members:', error);
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
+  const showConfirmPaymentModal = (member) => {
+    setMemberToConfirm(member);
+    setShowConfirmModal(true);
+  };
+
+  const confirmPayment = async () => {
+    if (!memberToConfirm) return;
+    
+    try {
+      setIsConfirming(true);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/members/${memberToConfirm._id}/confirm-payment`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to confirm payment');
+      }
+
+      setShowConfirmModal(false);
+      showAlert('success', `🎉 Payment confirmed for ${memberToConfirm.firstName} ${memberToConfirm.lastName}! Customer has been notified.`);
+      fetchMembers();
+      fetchPendingMembers();
+      fetchMemberStats();
+      setMemberToConfirm(null);
+    } catch (error) {
+      console.error('Error confirming payment:', error);
+      showAlert('error', 'Failed to confirm payment');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const viewReceipt = (receiptPath, memberName) => {
+    setSelectedReceipt({
+      path: receiptPath,
+      memberName: memberName
+    });
+    setShowReceiptModal(true);
   };
 
   const statsData = [
@@ -379,6 +464,95 @@ function Members() {
           </div>
         ))}
       </div>
+
+      {/* Pending Payments Section */}
+      {pendingMembers.length > 0 && (
+        <div className="bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 backdrop-blur-xl rounded-xl border border-yellow-500/20 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-yellow-500/20 rounded-lg">
+                <FiAlertCircle className="h-6 w-6 text-yellow-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Payment Verification Required</h2>
+                <p className="text-gray-400">Members waiting for payment confirmation</p>
+              </div>
+            </div>
+            <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm font-medium">
+              {pendingMembers.length} pending
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {pendingLoading ? (
+              <div className="col-span-full flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500"></div>
+              </div>
+            ) : (
+              pendingMembers.map((member) => (
+                <div
+                  key={member._id}
+                  className="bg-gray-800/60 backdrop-blur-lg rounded-lg p-4 border border-yellow-500/30 hover:border-yellow-500/50 transition-all duration-300"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-white font-semibold">
+                        {member.firstName[0]}{member.lastName[0]}
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-white">
+                          {member.firstName} {member.lastName}
+                        </h3>
+                        <p className="text-sm text-gray-400">{member.email}</p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                      Pending
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-sm text-gray-400 mb-4">
+                    <div className="flex justify-between">
+                      <span>Plan:</span>
+                      <span className="text-white">{member.membershipPlan?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Joined:</span>
+                      <span className="text-white">
+                        {new Date(member.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Payment Method:</span>
+                      <span className="text-white">Bank Transfer</span>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2">
+                    {/* View Receipt Button - if receipt exists */}
+                    <button
+                      onClick={() => viewReceipt(member.paymentDetails?.receiptPath || 'sample-receipt', `${member.firstName} ${member.lastName}`)}
+                      className="flex-1 flex items-center justify-center px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+                    >
+                      <FiEye className="w-4 h-4 mr-1" />
+                      View Receipt
+                    </button>
+                    
+                    {/* Confirm Payment Button */}
+                    <button
+                      onClick={() => showConfirmPaymentModal(member)}
+                      className="flex-1 flex items-center justify-center px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-300 text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+                    >
+                      <FiCreditCard className="w-4 h-4 mr-1" />
+                      Confirm Payment
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-4">
@@ -984,6 +1158,265 @@ function Members() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Viewing Modal */}
+      {showReceiptModal && selectedReceipt && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
+            {/* Modal Overlay */}
+            <div
+              className="fixed inset-0 transition-opacity"
+              aria-hidden="true"
+              onClick={() => setShowReceiptModal(false)}
+            >
+              <div className="absolute inset-0 bg-gray-900 opacity-75"></div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 rounded-2xl border border-gray-700 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-white">
+                    Payment Receipt Verification
+                  </h3>
+                  <p className="text-gray-400 mt-1">
+                    Member: {selectedReceipt.memberName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowReceiptModal(false);
+                    setSelectedReceipt(null);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <FiX className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Receipt Display Area */}
+              <div className="bg-gray-900/50 rounded-lg p-4 mb-6 min-h-[400px] max-h-[600px] overflow-auto">
+                {selectedReceipt.path && selectedReceipt.path !== 'sample-receipt' ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center">
+                    {selectedReceipt.path.endsWith('.pdf') ? (
+                      <iframe
+                        src={selectedReceipt.path.startsWith('http') 
+                          ? selectedReceipt.path 
+                          : `${import.meta.env.VITE_SERVER_URL}/${selectedReceipt.path}`}
+                        className="w-full h-[500px] rounded-lg"
+                        title="Payment Receipt"
+                      />
+                    ) : (
+                      <img
+                        src={selectedReceipt.path.startsWith('http') 
+                          ? selectedReceipt.path 
+                          : `${import.meta.env.VITE_SERVER_URL}/${selectedReceipt.path}`}
+                        alt="Payment Receipt"
+                        className="max-w-full h-auto rounded-lg"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
+                    <FiAlertCircle className="w-16 h-16 mb-4" />
+                    <p className="text-lg">Sample Receipt</p>
+                    <p className="text-sm mt-2">No receipt uploaded for this member</p>
+                    <div className="mt-8 p-6 bg-gray-800 rounded-lg max-w-md">
+                      <h4 className="text-white font-semibold mb-3">Bank Transfer Details (Sample)</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Date:</span>
+                          <span className="text-white">{new Date().toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Amount:</span>
+                          <span className="text-white">LKR 5,000.00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Reference:</span>
+                          <span className="text-white">TRX-{Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Bank:</span>
+                          <span className="text-white">Commercial Bank</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Verification Actions */}
+              <div className="bg-gray-900/30 rounded-lg p-4 mb-4">
+                <h4 className="text-white font-medium mb-3">Verification Checklist</h4>
+                <div className="space-y-2">
+                  <label className="flex items-center text-gray-300 cursor-pointer hover:text-white">
+                    <input type="checkbox" className="mr-3 w-4 h-4 text-violet-600 bg-gray-700 border-gray-600 rounded focus:ring-violet-500" />
+                    Amount matches the membership fee
+                  </label>
+                  <label className="flex items-center text-gray-300 cursor-pointer hover:text-white">
+                    <input type="checkbox" className="mr-3 w-4 h-4 text-violet-600 bg-gray-700 border-gray-600 rounded focus:ring-violet-500" />
+                    Transaction date is recent
+                  </label>
+                  <label className="flex items-center text-gray-300 cursor-pointer hover:text-white">
+                    <input type="checkbox" className="mr-3 w-4 h-4 text-violet-600 bg-gray-700 border-gray-600 rounded focus:ring-violet-500" />
+                    Reference number is valid
+                  </label>
+                  <label className="flex items-center text-gray-300 cursor-pointer hover:text-white">
+                    <input type="checkbox" className="mr-3 w-4 h-4 text-violet-600 bg-gray-700 border-gray-600 rounded focus:ring-violet-500" />
+                    Bank account details match
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={() => {
+                    window.open(`${import.meta.env.VITE_SERVER_URL}/${selectedReceipt.path}`, '_blank');
+                  }}
+                  className="px-4 py-2 text-gray-400 hover:text-white transition-colors flex items-center"
+                >
+                  <FiEye className="w-4 h-4 mr-2" />
+                  Open in New Tab
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReceiptModal(false);
+                    setSelectedReceipt(null);
+                  }}
+                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Beautiful Payment Confirmation Modal */}
+      {showConfirmModal && memberToConfirm && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
+            {/* Enhanced Modal Overlay with Blur */}
+            <div
+              className="fixed inset-0 transition-all duration-300"
+              aria-hidden="true"
+              onClick={() => !isConfirming && setShowConfirmModal(false)}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-900/50 via-purple-900/50 to-indigo-900/50 backdrop-blur-sm"></div>
+            </div>
+
+            {/* Beautiful Modal Content */}
+            <div className="relative inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 shadow-2xl rounded-3xl border border-violet-500/20">
+              
+              {/* Animated Background Pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-500 animate-pulse"></div>
+              </div>
+              
+              {/* Success Icon with Animation */}
+              <div className="relative flex justify-center mb-6">
+                <div className="relative">
+                  <div className="w-20 h-20 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                    <FiCreditCard className="w-10 h-10 text-white animate-pulse" />
+                  </div>
+                  {/* Glow Effect */}
+                  <div className="absolute inset-0 w-20 h-20 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500 rounded-full opacity-30 animate-ping"></div>
+                </div>
+              </div>
+
+              {/* Title with Gradient Text */}
+              <div className="text-center mb-6">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-violet-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent mb-2">
+                  🎉 Confirm Payment
+                </h3>
+                <p className="text-gray-300 text-sm">
+                  You're about to activate this member's premium experience
+                </p>
+              </div>
+
+              {/* Member Information Card */}
+              <div className="bg-gradient-to-r from-violet-900/30 via-purple-900/30 to-indigo-900/30 rounded-2xl p-4 mb-6 border border-violet-500/20">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-violet-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {memberToConfirm.firstName.charAt(0)}{memberToConfirm.lastName.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 className="text-white font-semibold text-lg">
+                      {memberToConfirm.firstName} {memberToConfirm.lastName}
+                    </h4>
+                    <p className="text-gray-400 text-sm">{memberToConfirm.email}</p>
+                    <p className="text-emerald-400 text-sm font-medium">
+                      💰 {memberToConfirm.membershipPlan?.name} Plan
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Confirmation Benefits */}
+              <div className="mb-6">
+                <h4 className="text-white font-medium mb-3 flex items-center">
+                  <FiStar className="w-4 h-4 mr-2 text-yellow-400" />
+                  What happens next:
+                </h4>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
+                    Member status will be activated immediately
+                  </li>
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full mr-3 animate-pulse"></div>
+                    Welcome notification sent to customer
+                  </li>
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full mr-3 animate-pulse"></div>
+                    Full gym access granted
+                  </li>
+                </ul>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={isConfirming}
+                  className="flex-1 px-4 py-3 bg-gray-700/50 text-gray-300 rounded-xl hover:bg-gray-600/50 transition-all duration-300 font-medium disabled:opacity-50 border border-gray-600/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmPayment}
+                  disabled={isConfirming}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 text-white rounded-xl hover:from-green-600 hover:via-emerald-600 hover:to-teal-600 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:transform-none disabled:hover:scale-100"
+                >
+                  {isConfirming ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Confirming...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <FiCheck className="w-5 h-5 mr-2" />
+                      Confirm Payment
+                    </div>
+                  )}
+                </button>
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={() => !isConfirming && setShowConfirmModal(false)}
+                disabled={isConfirming}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-gray-700/50 disabled:opacity-50"
+              >
+                <FiX className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>

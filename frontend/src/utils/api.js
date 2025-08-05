@@ -36,6 +36,57 @@ class ApiService {
     return headers;
   }
 
+  // Generic HTTP methods
+  async get(url, config = {}) {
+    const response = await fetch(`${this.baseURL}${url}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      ...config
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async post(url, data = null, config = {}) {
+    const isFormData = data instanceof FormData;
+    
+    const response = await fetch(`${this.baseURL}${url}`, {
+      method: 'POST',
+      headers: this.getHeaders(isFormData),
+      credentials: 'include',
+      body: data ? (isFormData ? data : JSON.stringify(data)) : null,
+      ...config
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async put(url, data = null, config = {}) {
+    const isFormData = data instanceof FormData;
+    
+    const response = await fetch(`${this.baseURL}${url}`, {
+      method: 'PUT',
+      headers: this.getHeaders(isFormData),
+      credentials: 'include',
+      body: data ? (isFormData ? data : JSON.stringify(data)) : null,
+      ...config
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async delete(url, config = {}) {
+    const response = await fetch(`${this.baseURL}${url}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      ...config
+    });
+    
+    return this.handleResponse(response);
+  }
+
   // Auth endpoints
   async register(userData) {
     const response = await fetch(`${this.baseURL}/auth/register`, {

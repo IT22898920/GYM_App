@@ -51,7 +51,7 @@ const memberSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['active', 'inactive', 'suspended'],
-    default: 'active'
+    required: true
   },
   lastVisit: {
     type: Date
@@ -142,7 +142,11 @@ const memberSchema = new mongoose.Schema({
     paymentStatus: {
       type: String,
       enum: ['paid', 'pending', 'overdue'],
-      default: 'paid'
+      required: true
+    },
+    receiptPath: {
+      type: String,
+      default: null
     }
   },
   emergencyContact: {

@@ -9,6 +9,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { FiCreditCard, FiDollarSign, FiArrowLeft, FiLoader } from "react-icons/fi";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../contexts/AuthContext";
 
 const stripePromise = loadStripe("your_publishable_key");
 
@@ -41,18 +42,59 @@ const fitnessGoals = [
   "General Fitness",
 ];
 
-function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
+function PaymentForm({ onSuccess, onCancel, selectedPlan, gymId }) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [gymOwnerBankDetails, setGymOwnerBankDetails] = useState(null);
+  const [receiptFile, setReceiptFile] = useState(null);
+
+  // Load gym owner bank details when component mounts
+  useEffect(() => {
+    const loadGymOwnerBankDetails = async () => {
+      try {
+        // First get gym details to find the owner
+        const gymResponse = await axios.get(`http://localhost:5000/api/gyms/${gymId}`);
+        if (gymResponse.data.success && gymResponse.data.data.owner) {
+          // Extract owner ID - handle both object and string cases
+          const owner = gymResponse.data.data.owner;
+          const ownerId = typeof owner === 'object' ? owner._id : owner;
+          
+          // Get the gym owner's bank details
+          const bankResponse = await axios.get(`http://localhost:5000/api/users/${ownerId}/bank-account`);
+          if (bankResponse.data.success && bankResponse.data.data) {
+            setGymOwnerBankDetails(bankResponse.data.data);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading gym owner bank details:", error);
+      }
+    };
+
+    if (gymId) {
+      loadGymOwnerBankDetails();
+    }
+  }, [gymId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (paymentMethod === "manual") {
-      onSuccess({ paymentMethod: "manual" });
+    if (!paymentMethod) {
+      setError("Please select a payment method");
+      return;
+    }
+
+    if (paymentMethod === "bank_transfer") {
+      if (!receiptFile) {
+        setError("Please upload payment receipt");
+        return;
+      }
+      onSuccess({ 
+        paymentMethod: "bank_transfer",
+        receiptFile: receiptFile 
+      });
       return;
     }
 
@@ -121,7 +163,7 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
 
         <label
           className={`block p-4 rounded-lg border cursor-pointer transition-all ${
-            paymentMethod === "manual"
+            paymentMethod === "bank_transfer"
               ? "bg-violet-900/20 border-violet-500"
               : "bg-gray-800 border-gray-700 hover:border-gray-600"
           }`}
@@ -129,16 +171,16 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
           <input
             type="radio"
             name="paymentMethod"
-            value="manual"
-            checked={paymentMethod === "manual"}
+            value="bank_transfer"
+            checked={paymentMethod === "bank_transfer"}
             onChange={(e) => setPaymentMethod(e.target.value)}
             className="hidden"
           />
           <div className="flex items-center">
             <FiDollarSign className="w-5 h-5 mr-3 text-violet-400" />
             <div>
-              <div className="font-medium text-white">Manual Payment</div>
-              <div className="text-sm text-gray-400">Pay at the front desk</div>
+              <div className="font-medium text-white">Bank Transfer</div>
+              <div className="text-sm text-gray-400">Transfer to gym owner's bank account</div>
             </div>
           </div>
         </label>
@@ -148,6 +190,65 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
             <div className="p-4 bg-gray-800 rounded-lg">
               <CardElement options={CARD_ELEMENT_OPTIONS} />
             </div>
+            {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
+          </div>
+        )}
+
+        {paymentMethod === "bank_transfer" && (
+          <div className="mt-4 space-y-4">
+            {gymOwnerBankDetails ? (
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <h3 className="text-lg font-semibold text-white mb-4">Bank Transfer Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-400">Account Holder</p>
+                    <p className="text-white font-medium">{gymOwnerBankDetails.accountHolderName}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Bank Name</p>
+                    <p className="text-white font-medium">{gymOwnerBankDetails.bankName}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Account Number</p>
+                    <p className="text-white font-mono">{gymOwnerBankDetails.accountNumber}</p>
+                  </div>
+                  {gymOwnerBankDetails.branchName && (
+                    <div>
+                      <p className="text-gray-400">Branch</p>
+                      <p className="text-white font-medium">{gymOwnerBankDetails.branchName}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-gray-400">Amount to Transfer</p>
+                    <p className="text-white font-bold text-lg">Rs. {selectedPlan.price}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <p className="text-gray-400">Loading bank account details...</p>
+              </div>
+            )}
+
+            {/* Receipt Upload Section */}
+            <div className="p-4 bg-gray-800 rounded-lg">
+              <h4 className="text-md font-semibold text-white mb-3">Upload Payment Receipt</h4>
+              <p className="text-sm text-gray-400 mb-3">
+                After making the bank transfer, please upload your payment receipt here.
+              </p>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => setReceiptFile(e.target.files[0])}
+                className="w-full p-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-violet-500"
+              />
+              {receiptFile && (
+                <p className="text-sm text-green-400 mt-2">
+                  Receipt selected: {receiptFile.name}
+                </p>
+              )}
+            </div>
+
             {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
           </div>
         )}
@@ -177,6 +278,7 @@ function PaymentForm({ onSuccess, onCancel, selectedPlan }) {
 export default function CustomerRegisterGym() {
   const { gymId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [gym, setGym] = useState(null);
   const [gymLoading, setGymLoading] = useState(true);
@@ -188,8 +290,6 @@ export default function CustomerRegisterGym() {
     dateOfBirth: "",
     email: "",
     phone: "",
-    password: "",
-    confirmPassword: "",
     height: "",
     weight: "",
     bmi: "",
@@ -200,7 +300,7 @@ export default function CustomerRegisterGym() {
     thighs: "",
     plan: "basic",
     fitnessGoals: [],
-    paymentMethod: "card",
+    paymentMethod: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -235,6 +335,19 @@ export default function CustomerRegisterGym() {
 
     fetchGym();
   }, [gymId]);
+
+  // Auto-fill user email if logged in
+  useEffect(() => {
+    if (user && user.email) {
+      setFormData(prev => ({
+        ...prev,
+        email: user.email,
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        phone: user.phone || ""
+      }));
+    }
+  }, [user]);
 
   // Use gym's membership plans if available, otherwise use default plans
   const plans = gym?.pricing?.membershipPlans && gym.pricing.membershipPlans.length > 0 
@@ -327,10 +440,6 @@ export default function CustomerRegisterGym() {
       if (!/\S+@\S+\.\S+/.test(formData.email))
         newErrors.email = "Invalid email format";
       if (!formData.phone) newErrors.phone = "Phone number is required";
-      if (!formData.password) newErrors.password = "Password is required";
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = "Passwords do not match";
-      }
     } else if (step === 2) {
       if (!formData.height) newErrors.height = "Height is required";
       if (!formData.weight) newErrors.weight = "Weight is required";
@@ -351,21 +460,89 @@ export default function CustomerRegisterGym() {
     setStep((prev) => prev - 1);
   };
 
-  const handlePaymentSuccess = (paymentDetails) => {
-    // Handle successful registration
-    console.log('Registration successful:', {
-      ...formData,
-      paymentDetails,
-      gymId,
-    });
-    
-    // You can add API call here to submit the registration
-    // For now, redirect to success page or gym page
-    navigate('/find-gym', { 
-      state: { 
-        message: 'Registration successful! Welcome to ' + (gym?.gymName || 'the gym') + '!' 
-      } 
-    });
+  const handlePaymentSuccess = async (paymentDetails) => {
+    try {
+      // Prepare form data for submission
+      const submitFormData = new FormData();
+      
+      // Add all form fields
+      Object.keys(formData).forEach(key => {
+        if (formData[key] !== null && formData[key] !== '') {
+          // Handle arrays and objects by converting to JSON string
+          if (Array.isArray(formData[key]) || typeof formData[key] === 'object') {
+            submitFormData.append(key, JSON.stringify(formData[key]));
+          } else {
+            submitFormData.append(key, formData[key]);
+          }
+        }
+      });
+      
+      // Add missing fields with defaults
+      if (!formData.healthConditions) {
+        submitFormData.append('healthConditions', JSON.stringify([]));
+      }
+      
+      // Add emergencyContact if not present (create a basic one)
+      if (!formData.emergencyContact) {
+        submitFormData.append('emergencyContact', JSON.stringify({
+          name: '',
+          relationship: '',
+          phone: ''
+        }));
+      }
+      
+      // Add payment method
+      submitFormData.append('paymentMethod', paymentDetails.paymentMethod);
+      
+      // Add receipt file if bank transfer
+      if (paymentDetails.paymentMethod === 'bank_transfer' && paymentDetails.receiptFile) {
+        submitFormData.append('receipt', paymentDetails.receiptFile);
+      }
+
+      console.log('DEBUG - Payment details:', paymentDetails);
+      console.log('DEBUG - Payment method being sent:', paymentDetails.paymentMethod);
+      console.log('Submitting registration:', {
+        formData: Object.fromEntries(submitFormData.entries()),
+        gymId,
+        paymentDetails
+      });
+
+      // Submit registration to backend
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/members/register/${gymId}`,
+        submitFormData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      if (response.data.success) {
+        console.log('Registration successful:', response.data);
+        
+        // Navigate to success page
+        navigate('/find-gym', { 
+          state: { 
+            message: response.data.message || 'Registration successful! Welcome to ' + (gym?.gymName || 'the gym') + '!',
+            type: 'success'
+          } 
+        });
+      } else {
+        throw new Error(response.data.message || 'Registration failed');
+      }
+      
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      // Show error message
+      navigate('/find-gym', { 
+        state: { 
+          message: error.response?.data?.message || 'Registration failed. Please try again.',
+          type: 'error'
+        } 
+      });
+    }
   };
 
   const handleCancel = () => {
@@ -504,16 +681,18 @@ export default function CustomerRegisterGym() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">
-                    First Name
+                    First Name {user && user.firstName && <span className="text-green-400">(Auto-filled)</span>}
                   </label>
                   <input
                     type="text"
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    className={`w-full p-3 bg-gray-800 text-white rounded-lg border ${
-                      errors.firstName ? "border-red-500" : "border-gray-700"
-                    } focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20`}
+                    className={`w-full p-3 text-white rounded-lg border ${
+                      user && user.firstName 
+                        ? "bg-gray-700 border-gray-600" 
+                        : "bg-gray-800 border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                    } ${errors.firstName ? "border-red-500" : ""}`}
                   />
                   {errors.firstName && (
                     <p className="text-red-500 text-sm mt-1">
@@ -524,16 +703,18 @@ export default function CustomerRegisterGym() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Last Name
+                    Last Name {user && user.lastName && <span className="text-green-400">(Auto-filled)</span>}
                   </label>
                   <input
                     type="text"
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleChange}
-                    className={`w-full p-3 bg-gray-800 text-white rounded-lg border ${
-                      errors.lastName ? "border-red-500" : "border-gray-700"
-                    } focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20`}
+                    className={`w-full p-3 text-white rounded-lg border ${
+                      user && user.lastName 
+                        ? "bg-gray-700 border-gray-600" 
+                        : "bg-gray-800 border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                    } ${errors.lastName ? "border-red-500" : ""}`}
                   />
                   {errors.lastName && (
                     <p className="text-red-500 text-sm mt-1">
@@ -586,16 +767,19 @@ export default function CustomerRegisterGym() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Email
+                    Email {user && user.email && <span className="text-green-400">(Auto-filled from your account)</span>}
                   </label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full p-3 bg-gray-800 text-white rounded-lg border ${
-                      errors.email ? "border-red-500" : "border-gray-700"
-                    } focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20`}
+                    readOnly={user && user.email}
+                    className={`w-full p-3 text-white rounded-lg border ${
+                      user && user.email 
+                        ? "bg-gray-700 cursor-not-allowed border-gray-600" 
+                        : "bg-gray-800 border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                    } ${errors.email ? "border-red-500" : ""}`}
                   />
                   {errors.email && (
                     <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -604,63 +788,24 @@ export default function CustomerRegisterGym() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Phone Number
+                    Phone Number {user && user.phone && <span className="text-green-400">(Auto-filled)</span>}
                   </label>
                   <input
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className={`w-full p-3 bg-gray-800 text-white rounded-lg border ${
-                      errors.phone ? "border-red-500" : "border-gray-700"
-                    } focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20`}
+                    className={`w-full p-3 text-white rounded-lg border ${
+                      user && user.phone 
+                        ? "bg-gray-700 border-gray-600" 
+                        : "bg-gray-800 border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                    } ${errors.phone ? "border-red-500" : ""}`}
                   />
                   {errors.phone && (
                     <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={`w-full p-3 bg-gray-800 text-white rounded-lg border ${
-                      errors.password ? "border-red-500" : "border-gray-700"
-                    } focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20`}
-                  />
-                  {errors.password && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {errors.password}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    className={`w-full p-3 bg-gray-800 text-white rounded-lg border ${
-                      errors.confirmPassword
-                        ? "border-red-500"
-                        : "border-gray-700"
-                    } focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20`}
-                  />
-                  {errors.confirmPassword && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {errors.confirmPassword}
-                    </p>
-                  )}
-                </div>
               </div>
 
               <div className="flex justify-between pt-6">
@@ -921,6 +1066,7 @@ export default function CustomerRegisterGym() {
                 onSuccess={handlePaymentSuccess}
                 onCancel={handleCancel}
                 selectedPlan={selectedPlan}
+                gymId={gymId}
               />
             </Elements>
           )}

@@ -78,9 +78,14 @@ function GymRegistrations() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/gyms`, {
+      
+      // Get all gyms for admin to see pending, approved, and rejected
+      // No status parameter = admin gets all gyms regardless of status
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/gyms?limit=100`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('Fetched all gym registrations:', response.data);
+      
       setRegistrations(response.data.data || []);
     } catch (error) {
       showAlert('error', 'Failed to fetch gym registrations');
