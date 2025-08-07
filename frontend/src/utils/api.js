@@ -373,8 +373,13 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  async getFreelanceInstructors() {
-    const response = await fetch(`${this.baseURL}/instructors/freelance`, {
+  async getFreelanceInstructors(gymId = null) {
+    let url = `${this.baseURL}/instructors/freelance`;
+    if (gymId) {
+      url += `?gymId=${gymId}`;
+    }
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: this.getHeaders(),
       credentials: 'include'

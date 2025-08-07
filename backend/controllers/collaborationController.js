@@ -217,10 +217,29 @@ export const respondToRequest = async (req, res) => {
     if (action === 'accept') {
       await request.accept(responseMessage);
       
-      // Add instructor to gym
+      // Add instructor to gym with proper structure
       const gym = await Gym.findById(request.gym);
-      if (!gym.instructors.includes(instructorId)) {
-        gym.instructors.push(instructorId);
+      const existingInstructor = gym.instructors.find(inst => 
+        inst.instructor && inst.instructor.toString() === instructorId
+      );
+      
+      if (!existingInstructor) {
+        // Get instructor's application details for specialization
+        const instructorApplication = await InstructorApplication.findOne({
+          applicant: instructorId,
+          status: 'approved'
+        });
+        
+        // Create instructor object with proper structure
+        const instructorObject = {
+          instructor: instructorId,
+          addedAt: new Date(),
+          specialization: instructorApplication?.specialization || 'General Fitness',
+          startDate: new Date(),
+          isActive: true
+        };
+        
+        gym.instructors.push(instructorObject);
         await gym.save();
       }
 

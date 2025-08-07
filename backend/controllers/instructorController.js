@@ -714,6 +714,8 @@ export const getInstructorById = async (req, res) => {
 // Get freelance instructors for gym owners to apply to
 export const getFreelanceInstructors = async (req, res) => {
   try {
+    const { gymId } = req.query; // Get gym ID from query parameters
+    
     // Find approved instructor applications where isFreelance is true
     const freelanceInstructors = await InstructorApplication.find({
       status: 'approved',
@@ -723,7 +725,7 @@ export const getFreelanceInstructors = async (req, res) => {
     .select('specialization experience preferredLocation availability profilePicture certifications resume isFreelance motivation')
     .sort({ createdAt: -1 });
 
-    const instructorsWithDetails = freelanceInstructors.map(application => ({
+    let instructorsWithDetails = freelanceInstructors.map(application => ({
       _id: application.applicant._id,
       firstName: application.applicant.firstName,
       lastName: application.applicant.lastName,
@@ -741,6 +743,23 @@ export const getFreelanceInstructors = async (req, res) => {
         motivation: application.motivation
       }
     }));
+
+    // If gymId is provided, exclude instructors who already have accepted collaboration requests with this gym
+    if (gymId) {
+      const CollaborationRequest = (await import('../models/CollaborationRequest.js')).default;
+      
+      const acceptedCollaborations = await CollaborationRequest.find({
+        gym: gymId,
+        status: 'accepted'
+      }).select('toInstructor');
+
+      const acceptedInstructorIds = acceptedCollaborations.map(collab => collab.toInstructor.toString());
+      
+      // Filter out instructors who already have accepted collaboration requests with this gym
+      instructorsWithDetails = instructorsWithDetails.filter(instructor => 
+        !acceptedInstructorIds.includes(instructor._id.toString())
+      );
+    }
 
     res.status(200).json({
       success: true,

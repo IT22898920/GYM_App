@@ -42,9 +42,11 @@ function ApplyToInstructor() {
   // Fetch freelance instructors
   useEffect(() => {
     const fetchFreelanceInstructors = async () => {
+      if (!selectedGym) return; // Don't fetch if no gym is selected
+      
       try {
         setLoading(true);
-        const response = await api.getFreelanceInstructors();
+        const response = await api.getFreelanceInstructors(selectedGym);
         if (response.success) {
           setInstructors(response.data);
         } else {
@@ -59,7 +61,7 @@ function ApplyToInstructor() {
     };
 
     fetchFreelanceInstructors();
-  }, [showAlert]);
+  }, [selectedGym, showAlert]); // Add selectedGym as dependency
 
   // Fetch gym owner's gyms
   useEffect(() => {
@@ -163,6 +165,25 @@ function ApplyToInstructor() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Gym Selection Dropdown */}
+          {gyms.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <label className="text-gray-300 text-sm font-medium">Select Gym</label>
+              <select
+                value={selectedGym}
+                onChange={(e) => setSelectedGym(e.target.value)}
+                className="bg-gray-800/40 backdrop-blur-xl text-white rounded-lg px-4 py-2 border border-gray-700/50 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none appearance-none cursor-pointer min-w-[200px]"
+              >
+                <option value="">Choose a gym...</option>
+                {gyms.map((gym) => (
+                  <option key={gym._id} value={gym._id}>
+                    {gym.gymName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          
           <div className="px-4 py-2 bg-gray-800/40 backdrop-blur-xl rounded-lg border border-gray-700/50">
             <div className="flex items-center gap-2">
               <FiUser className="w-5 h-5 text-violet-400" />
@@ -246,7 +267,13 @@ function ApplyToInstructor() {
       </div>
 
       {/* Instructors Grid */}
-      {loading ? (
+      {!selectedGym && gyms.length > 1 ? (
+        <div className="text-center py-16 bg-gray-800/20 rounded-2xl border border-gray-700/30">
+          <FiUser className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-300 mb-2">Select a gym to view instructors</h3>
+          <p className="text-gray-400">Choose a gym from the dropdown above to find available freelance instructors</p>
+        </div>
+      ) : loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-violet-600 mx-auto mb-4"></div>
@@ -257,7 +284,9 @@ function ApplyToInstructor() {
         <div className="text-center py-16 bg-gray-800/20 rounded-2xl border border-gray-700/30">
           <FiUser className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-300 mb-2">No instructors found</h3>
-          <p className="text-gray-400">Try adjusting your filters or search criteria</p>
+          <p className="text-gray-400">
+            {selectedGym ? 'All available freelance instructors may have already been added to this gym, or try adjusting your filters' : 'Try adjusting your filters or search criteria'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">

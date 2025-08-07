@@ -1137,9 +1137,12 @@ export const getGymInstructors = async (req, res) => {
     }
 
     // For owners and admins, return full instructor info
+    // Filter out instructors where population failed (instructor is null)
+    const validInstructors = gym.instructors.filter(inst => inst.instructor && inst.instructor._id);
+    
     res.status(200).json({
       success: true,
-      data: gym.instructors
+      data: validInstructors
     });
 
   } catch (error) {
