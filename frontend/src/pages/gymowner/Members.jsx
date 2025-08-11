@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAlert } from "../../contexts/AlertContext";
+import api from "../../utils/api";
 import {
   FiUsers,
   FiPlus,
@@ -59,6 +60,8 @@ function Members() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedInstructor, setSelectedInstructor] = useState("");
+  const [instructors, setInstructors] = useState([]);
+  const [instructorsLoading, setInstructorsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
@@ -79,6 +82,11 @@ function Members() {
     fetchMemberStats();
     fetchPendingMembers();
   }, [currentPage, searchTerm, selectedFilter]);
+
+  // Fetch instructors only once on component mount
+  useEffect(() => {
+    fetchInstructors();
+  }, []);
 
   const fetchMembers = async () => {
     try {
@@ -243,36 +251,26 @@ function Members() {
     },
   ];
 
-  // Sample data for instructors
-  const instructors = [
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      specialization: "Yoga",
-      rating: 4.9,
-      availability: ["Morning", "Evening"],
-      experience: "5 years",
-      image: "https://i.pravatar.cc/150?img=1",
-    },
-    {
-      id: 2,
-      name: "Mike Chen",
-      specialization: "Strength Training",
-      rating: 4.8,
-      availability: ["Afternoon", "Evening"],
-      experience: "7 years",
-      image: "https://i.pravatar.cc/150?img=2",
-    },
-    {
-      id: 3,
-      name: "Emma Rodriguez",
-      specialization: "HIIT",
-      rating: 4.7,
-      availability: ["Morning", "Afternoon"],
-      experience: "4 years",
-      image: "https://i.pravatar.cc/150?img=3",
-    },
-  ];
+  // Fetch gym instructors
+  const fetchInstructors = async () => {
+    try {
+      setInstructorsLoading(true);
+      // First get the gym details to get the gym ID
+      const gymResponse = await api.getGymsByOwner();
+      if (gymResponse.success && gymResponse.data.length > 0) {
+        const gymId = gymResponse.data[0]._id;
+        const response = await api.getGymInstructors(gymId);
+        if (response.success) {
+          setInstructors(response.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching instructors:', error);
+      showAlert('Failed to fetch instructors', 'error');
+    } finally {
+      setInstructorsLoading(false);
+    }
+  };
 
   // -------------------------------
   // 2. Handle Assign/Update
@@ -289,34 +287,24 @@ function Members() {
     setIsUpdating(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/members/${selectedMember._id}/assign-instructor`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ instructorId: selectedInstructor })
-        }
-      );
+      const response = await api.assignInstructorToMember(selectedMember._id, selectedInstructor);
 
-      if (!response.ok) {
-        throw new Error('Failed to assign instructor');
+      if (response.success) {
+        // Refresh members list
+        await fetchMembers();
+
+        // Close modal and reset state
+        setShowAssignModal(false);
+        setSelectedMember(null);
+        setSelectedInstructor("");
+
+        showAlert('Instructor assigned successfully!', 'success');
+      } else {
+        throw new Error(response.message || 'Failed to assign instructor');
       }
-
-      // Refresh members list
-      await fetchMembers();
-
-      // Close modal and reset state
-      setShowAssignModal(false);
-      setSelectedMember(null);
-      setSelectedInstructor("");
-
-      showAlert('success', 'Instructor assigned successfully!');
     } catch (error) {
       console.error("Error assigning instructor:", error);
-      showAlert('error', 'Failed to assign instructor');
+      showAlert(error.message || 'Failed to assign instructor', 'error');
     } finally {
       setIsUpdating(false);
     }
@@ -407,14 +395,40 @@ function Members() {
               Grid View
             </button>
           </div>
-          {/* Replace your button with a Link */}
-          <Link
-            to="/gym-owner/add-member"
-            className="inline-flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-          >
-            <FiPlus className="w-5 h-5 mr-2" />
-            Add Member
-          </Link>
+          {/* Add Member Dropdown */}
+          <div className="relative group">
+            <button className="inline-flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors">
+              <FiPlus className="w-5 h-5 mr-2" />
+              Add Member
+              <FiChevronRight className="w-4 h-4 ml-2 transform group-hover:rotate-90 transition-transform" />
+            </button>
+            
+            {/* Dropdown Menu */}
+            <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-xl border border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <div className="py-2">
+                <Link
+                  to="/gym-owner/add-member"
+                  className="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                >
+                  <FiUserPlus className="w-5 h-5 mr-3 text-green-400" />
+                  <div>
+                    <div className="font-medium">Add New Member</div>
+                    <div className="text-sm text-gray-400">Create new account & add to gym</div>
+                  </div>
+                </Link>
+                <Link
+                  to="/gym-owner/add-existing-member"
+                  className="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                >
+                  <FiSearch className="w-5 h-5 mr-3 text-violet-400" />
+                  <div>
+                    <div className="font-medium">Add Existing User</div>
+                    <div className="text-sm text-gray-400">Search & add existing users</div>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -667,7 +681,7 @@ function Members() {
                     {/* 
                       --- Instructor Cell ---
                       If a member has an instructor, we show a "Update Instructor" button.
-                      Otherwise, we show "Assign Instructor".
+                      Otherwise, we show "Assign Instructor" (only for active members).
                     */}
                     <td className="p-4">
                       {member.assignedInstructor ? (
@@ -675,14 +689,16 @@ function Members() {
                           <div className="text-sm text-gray-300">
                             {member.assignedInstructor.firstName} {member.assignedInstructor.lastName}
                           </div>
-                          <button
-                            onClick={() => handleAssignInstructor(member)}
-                            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
-                          >
-                            Change
-                          </button>
+                          {member.status === "active" && (
+                            <button
+                              onClick={() => handleAssignInstructor(member)}
+                              className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                            >
+                              Change
+                            </button>
+                          )}
                         </div>
-                      ) : (
+                      ) : member.status === "active" ? (
                         <button
                           onClick={() => handleAssignInstructor(member)}
                           className="flex items-center text-violet-400 hover:text-violet-300 transition-colors"
@@ -690,6 +706,10 @@ function Members() {
                           <FiUserPlus className="w-4 h-4 mr-1" />
                           Assign Instructor
                         </button>
+                      ) : (
+                        <span className="text-gray-500 text-sm">
+                          Only active members
+                        </span>
                       )}
                     </td>
 
@@ -946,14 +966,20 @@ function Members() {
                   <div className="flex items-center justify-between text-gray-400">
                     <span>Assigned Instructor</span>
                     {member.assignedInstructor ? (
-                      <button
-                        onClick={() => handleAssignInstructor(member)}
-                        className="flex items-center text-emerald-400 hover:text-emerald-300 transition-colors"
-                      >
-                        <FiUserCheck className="w-4 h-4 mr-1" />
-                        Update Instructor
-                      </button>
-                    ) : (
+                      member.status === "active" ? (
+                        <button
+                          onClick={() => handleAssignInstructor(member)}
+                          className="flex items-center text-emerald-400 hover:text-emerald-300 transition-colors"
+                        >
+                          <FiUserCheck className="w-4 h-4 mr-1" />
+                          Update Instructor
+                        </button>
+                      ) : (
+                        <span className="text-gray-500 text-sm">
+                          Only active members
+                        </span>
+                      )
+                    ) : member.status === "active" ? (
                       <button
                         onClick={() => handleAssignInstructor(member)}
                         className="flex items-center text-violet-400 hover:text-violet-300 transition-colors"
@@ -961,6 +987,10 @@ function Members() {
                         <FiUserPlus className="w-4 h-4 mr-1" />
                         Assign Instructor
                       </button>
+                    ) : (
+                      <span className="text-gray-500 text-sm">
+                        Only active members
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1056,54 +1086,70 @@ function Members() {
 
                 {/* Instructor Selection */}
                 <div className="grid grid-cols-1 gap-4">
-                  {instructors.map((instructor) => (
-                    <label
-                      key={instructor.id}
-                      className={`flex items-start p-4 rounded-lg border cursor-pointer transition-all duration-300 ${
-                        selectedInstructor === instructor.name
-                          ? "bg-violet-500/10 border-violet-500"
-                          : "bg-gray-900/50 border-gray-700 hover:bg-gray-800/50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="instructor"
-                        value={instructor.id}
-                        checked={selectedInstructor === instructor.id}
-                        onChange={(e) => setSelectedInstructor(e.target.value)}
-                        className="hidden"
-                      />
-                      <div className="flex items-center space-x-4 flex-1">
-                        <img
-                          src={instructor.image}
-                          alt={instructor.name}
-                          className="w-12 h-12 rounded-full object-cover"
+                  {instructorsLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-violet-600 mx-auto mb-4"></div>
+                      <p className="text-gray-400">Loading instructors...</p>
+                    </div>
+                  ) : instructors.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-900/50 rounded-lg border border-gray-700">
+                      <FiUsers className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                      <h4 className="text-gray-300 font-medium mb-2">No Instructors Available</h4>
+                      <p className="text-gray-400 text-sm">Add instructors to your gym to assign them to members</p>
+                    </div>
+                  ) : (
+                    instructors.map((gymInstructor) => (
+                      <label
+                        key={gymInstructor._id}
+                        className={`flex items-start p-4 rounded-lg border cursor-pointer transition-all duration-300 ${
+                          selectedInstructor === gymInstructor.instructor?._id
+                            ? "bg-violet-500/10 border-violet-500"
+                            : "bg-gray-900/50 border-gray-700 hover:bg-gray-800/50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="instructor"
+                          value={gymInstructor.instructor?._id || ''}
+                          checked={selectedInstructor === gymInstructor.instructor?._id}
+                          onChange={(e) => setSelectedInstructor(e.target.value)}
+                          className="hidden"
                         />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-white font-medium">
-                              {instructor.name}
-                            </h4>
-                            <div className="flex items-center text-yellow-400">
-                              <FiStar className="w-4 h-4 mr-1" />
-                              <span className="text-white">
-                                {instructor.rating}
+                        <div className="flex items-center space-x-4 flex-1">
+                          <img
+                            src={`https://ui-avatars.com/api/?name=${gymInstructor.instructor?.firstName || 'Unknown'}+${gymInstructor.instructor?.lastName || 'User'}&background=8b5cf6&color=fff&size=150`}
+                            alt={`${gymInstructor.instructor?.firstName || 'Unknown'} ${gymInstructor.instructor?.lastName || 'User'}`}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-white font-medium">
+                                {gymInstructor.instructor?.firstName || 'Unknown'} {gymInstructor.instructor?.lastName || 'User'}
+                              </h4>
+                              <div className="flex items-center">
+                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                  gymInstructor.isActive 
+                                    ? 'bg-green-500/10 text-green-400' 
+                                    : 'bg-red-500/10 text-red-400'
+                                }`}>
+                                  {gymInstructor.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-violet-400 text-sm">
+                              {gymInstructor.specialization || 'General Fitness'}
+                            </p>
+                            <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+                              <span>{gymInstructor.instructor?.experience || 0} years experience</span>
+                              <span>
+                                Added: {new Date(gymInstructor.addedAt).toLocaleDateString()}
                               </span>
                             </div>
                           </div>
-                          <p className="text-violet-400 text-sm">
-                            {instructor.specialization}
-                          </p>
-                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
-                            <span>{instructor.experience}</span>
-                            <span>
-                              Available: {instructor.availability.join(", ")}
-                            </span>
-                          </div>
                         </div>
-                      </div>
-                    </label>
-                  ))}
+                      </label>
+                    ))
+                  )}
                 </div>
 
                 <div className="mt-6 flex justify-end space-x-4">

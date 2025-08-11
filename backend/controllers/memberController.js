@@ -23,6 +23,274 @@ const upload = multer({
 
 export const uploadReceipt = upload.single('receipt');
 
+// Search existing users
+export const searchExistingUsers = async (req, res) => {
+  try {
+    const { searchTerm, searchType } = req.query;
+    const gymOwnerId = req.user.id;
+
+    // Find the gym owned by this user
+    const gym = await Gym.findOne({ owner: gymOwnerId, status: 'approved' });
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'No approved gym found for this owner'
+      });
+    }
+
+    // Build search query
+    const searchQuery = {};
+    if (searchType === 'email') {
+      searchQuery.email = { $regex: searchTerm, $options: 'i' };
+    } else if (searchType === 'phone') {
+      searchQuery.phoneNumber = { $regex: searchTerm, $options: 'i' };
+    }
+
+    // Search for users
+    const users = await User.find(searchQuery)
+      .select('firstName lastName email phoneNumber gender dateOfBirth role')
+      .limit(10);
+
+    // Check if users are already members
+    const usersWithMembershipStatus = await Promise.all(users.map(async (user) => {
+      const membership = await Member.findOne({ user: user._id }).populate('gym', 'name');
+      return {
+        ...user.toObject(),
+        currentGym: membership ? membership.gym.name : null
+      };
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: usersWithMembershipStatus
+    });
+
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search users',
+      error: error.message
+    });
+  }
+};
+
+// Add existing user as member
+export const addExistingUserAsMember = async (req, res) => {
+  try {
+    const gymOwnerId = req.user.id;
+    const {
+      userId,
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      password,
+      gender,
+      dateOfBirth,
+      membershipPlan,
+      membershipPrice,
+      membershipFeatures,
+      bodyMeasurements,
+      fitnessGoals,
+      paymentDetails,
+      isExistingMember,
+      isNewExistingMember,
+      useCustomPassword
+    } = req.body;
+
+    // Find the gym owned by this user
+    const gym = await Gym.findOne({ owner: gymOwnerId, status: 'approved' });
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'No approved gym found for this owner'
+      });
+    }
+
+    let user;
+    let isNewUser = false;
+
+    if (isNewExistingMember) {
+      // Creating a completely new user OR adding existing user to this gym
+      // Check if user with this email already exists
+      const existingUser = await User.findOne({ email: email });
+      
+      if (existingUser) {
+        // User exists, check if they're already a member of this gym
+        const existingMember = await Member.findOne({ 
+          user: existingUser._id, 
+          gym: gym._id 
+        });
+        
+        if (existingMember) {
+          return res.status(400).json({
+            success: false,
+            message: 'This person is already a member of your gym'
+          });
+        }
+        
+        // User exists but not a member of this gym - add them
+        user = existingUser;
+        
+        // Generate new password for existing users being added as gym members
+        let newPassword;
+        if (useCustomPassword && password) {
+          newPassword = password;
+        } else {
+          newPassword = Math.random().toString(36).slice(-8) + 'Gym@2024';
+        }
+        
+        user.password = newPassword; // Don't hash manually - let User model pre-save hook handle it
+        await user.save();
+        user.temporaryPassword = newPassword; // For notification
+      } else {
+        // User doesn't exist - create new user
+        let newPassword;
+        if (useCustomPassword && password) {
+          newPassword = password;
+        } else {
+          newPassword = Math.random().toString(36).slice(-8) + 'Gym@2024';
+        }
+        
+        user = new User({
+          firstName: firstName,
+          lastName: lastName,
+          email: email,
+          phoneNumber: phoneNumber,
+          gender: gender,
+          dateOfBirth: dateOfBirth,
+          password: newPassword, // Don't hash manually - let User model pre-save hook handle it
+          role: 'customer',
+          isActive: true
+        });
+        
+        await user.save();
+        isNewUser = true;
+        user.temporaryPassword = newPassword; // For notification
+      }
+    } else {
+      // Existing user flow
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID is required for existing user'
+        });
+      }
+
+      // Check if member already exists in this gym
+      const existingMember = await Member.findOne({ 
+        user: userId, 
+        gym: gym._id 
+      });
+      
+      if (existingMember) {
+        return res.status(400).json({
+          success: false,
+          message: 'This user is already a member of your gym'
+        });
+      }
+
+      // Get the user
+      user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Generate a random password for the existing user if they haven't logged in
+      const randomPassword = Math.random().toString(36).slice(-8) + 'Gym@2024';
+      
+      // Update user password if this is an existing member
+      if (isExistingMember && !user.lastLogin) {
+        user.password = randomPassword; // Don't hash manually - let User model pre-save hook handle it
+        await user.save();
+        user.temporaryPassword = randomPassword; // For notification
+      }
+    }
+
+    // Create member record
+    const member = new Member({
+      gym: gym._id,
+      user: user._id,
+      firstName: firstName || user.firstName,
+      lastName: lastName || user.lastName,
+      email: email || user.email,
+      phoneNumber: phoneNumber || user.phoneNumber,
+      gender: gender || user.gender,
+      dateOfBirth: dateOfBirth || user.dateOfBirth,
+      membershipPlan: {
+        name: membershipPlan,
+        price: membershipPrice || 0,
+        features: membershipFeatures || [],
+        startDate: new Date()
+      },
+      bodyMeasurements: bodyMeasurements || {},
+      fitnessGoals: fitnessGoals || [],
+      paymentDetails: {
+        method: 'manual',
+        paymentStatus: paymentDetails?.paymentStatus || 'paid',
+        lastPaymentDate: paymentDetails?.lastPaymentDate || new Date(),
+        nextPaymentDate: paymentDetails?.nextPaymentDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      },
+      status: paymentDetails?.paymentStatus === 'paid' ? 'active' : 'inactive',
+      createdBy: gymOwnerId
+    });
+
+    await member.save();
+
+    // Send notification to the member with login credentials
+    if (user.temporaryPassword) {
+      await NotificationService.createNotification({
+        recipient: user._id,
+        sender: gymOwnerId,
+        type: 'member_joined_gym',
+        title: 'Welcome to ' + gym.gymName,
+        message: `You have been registered as a member at ${gym.gymName}. Your ${membershipPlan} membership is now active. Your login credentials are: Email: ${user.email}, Password: ${user.temporaryPassword}. Please change your password after first login.`,
+        data: {
+          gymId: gym._id,
+          memberId: member._id,
+          temporaryPassword: user.temporaryPassword
+        }
+      });
+
+      // Send email with credentials (if email service is configured)
+      // You can add email sending logic here
+    } else {
+      await NotificationService.createNotification({
+        recipient: user._id,
+        sender: gymOwnerId,
+        type: 'member_joined_gym',
+        title: 'Welcome to ' + gym.gymName,
+        message: `You have been registered as a member at ${gym.gymName}. Your ${membershipPlan} membership is now active.`,
+        data: {
+          gymId: gym._id,
+          memberId: member._id
+        }
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Member added successfully',
+      data: {
+        member,
+        temporaryPassword: user.temporaryPassword || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error adding existing user as member:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add member',
+      error: error.message
+    });
+  }
+};
+
 // Get gym's membership plans
 export const getGymMembershipPlans = async (req, res) => {
   try {
@@ -145,7 +413,7 @@ export const addMember = async (req, res) => {
     await NotificationService.createNotification({
       recipient: user._id,
       sender: gymOwnerId,
-      type: 'member_added',
+      type: 'member_joined_gym',
       title: 'Welcome to ' + gym.name,
       message: `You have been registered as a member at ${gym.name}. Your ${memberData.membershipPlan} membership is now active.`,
       data: {

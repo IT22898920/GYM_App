@@ -79,6 +79,7 @@ import VerifyRejectGym from "./pages/instructor/VerifyRejectGym";
 import FreelanceStudents from "./pages/instructor/Student/FreelanceStudents";
 import GymStudents from "./pages/instructor/Student/GymStudents";
 import AddMemberForm from "./pages/gymowner/AddMemberForm";
+import AddExistingMember from "./pages/gymowner/AddExistingMember";
 import InstructorMessages from "./pages/instructor/Messages";
 
 import FinanceAdmin from "./pages/admin/Finance";
@@ -152,6 +153,7 @@ function AppContent() {
           <Route path="apply-to-instructor" element={<ApplyToInstructor />} />
           <Route path="finance" element={<FinanceGym />} />
           <Route path="add-member" element={<AddMemberForm />} />
+          <Route path="add-existing-member" element={<AddExistingMember />} />
           <Route path="edit-gym-details" element={<EditGymDetails />} />
           <Route path="manage-images" element={<ManageImages />} />
           <Route path="update-location" element={<UpdateLocation />} />

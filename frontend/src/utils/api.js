@@ -462,6 +462,33 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // Member endpoints
+  async searchExistingUsers(searchTerm, searchType) {
+    const params = new URLSearchParams({
+      searchTerm,
+      searchType
+    });
+
+    const response = await fetch(`${this.baseURL}/members/search-users?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async addExistingUserAsMember(memberData) {
+    const response = await fetch(`${this.baseURL}/members/add-existing`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(memberData)
+    });
+    
+    return this.handleResponse(response);
+  }
+
   // Notification endpoints
   async getNotifications(page = 1, limit = 20, unreadOnly = false) {
     const params = new URLSearchParams({
@@ -710,6 +737,39 @@ class ApiService {
       method: 'GET',
       headers: this.getHeaders(),
       credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // Member Management endpoints
+  async assignInstructorToMember(memberId, instructorId) {
+    const response = await fetch(`${this.baseURL}/members/${memberId}/assign-instructor`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ instructorId })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async searchExistingUsers(search, type = 'email') {
+    const response = await fetch(`${this.baseURL}/members/search-users?search=${encodeURIComponent(search)}&type=${type}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async addExistingUserAsMember(memberData) {
+    const response = await fetch(`${this.baseURL}/members/add-existing`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(memberData)
     });
     
     return this.handleResponse(response);

@@ -11,7 +11,9 @@ import {
   getMemberStats,
   registerCustomerToGym,
   uploadReceipt,
-  confirmCustomerPayment
+  confirmCustomerPayment,
+  searchExistingUsers,
+  addExistingUserAsMember
 } from '../controllers/memberController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -30,8 +32,12 @@ router.get('/stats', getMemberStats);
 // Get gym's membership plans
 router.get('/membership-plans', getGymMembershipPlans);
 
+// Search existing users
+router.get('/search-users', searchExistingUsers);
+
 // CRUD operations
 router.post('/', addMember);
+router.post('/add-existing', addExistingUserAsMember);
 router.get('/', getMembers);
 router.get('/:memberId', getMember);
 router.put('/:memberId', updateMember);
