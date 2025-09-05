@@ -122,6 +122,11 @@ function AdminSidebar({ isOpen }) {
         icon: FiFileText,
         path: "/admin/documents",
       },
+      {
+        title: "Facilities",
+        icon: FiFileText,
+        path: "/admin/facilities",
+      },
     ],
     "gym-owner": [
       {

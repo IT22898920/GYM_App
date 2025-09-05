@@ -46,6 +46,16 @@ export const profileImageOptions = {
   resource_type: 'image'
 };
 
+// Upload options for workout GIFs
+export const workoutGifOptions = {
+  folder: 'gym-app/gifs',
+  allowed_formats: ['gif'],
+  transformation: [
+    { quality: 'auto' }
+  ],
+  resource_type: 'image'
+};
+
 // Upload options for payment receipts
 export const receiptOptions = {
   folder: 'gym-app/receipts',

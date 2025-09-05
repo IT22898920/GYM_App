@@ -85,6 +85,7 @@ import InstructorMessages from "./pages/instructor/Messages";
 import FinanceAdmin from "./pages/admin/Finance";
 import CustomerRegisterGym from "./pages/CustomerRegisterGym";
 import GymRegistrations from "./pages/admin/GymRegistrations";
+import Gif from "./pages/admin/Gif";
 
 
 function App() {
@@ -128,6 +129,7 @@ function AppContent() {
           <Route path="payments" element={<Pricing />} />
           <Route path="finance" element={<FinanceAdmin />} />
           <Route path="gym-registrations" element={<GymRegistrations />} />
+          <Route path="facilities" element={<Gif />} />
 
           <Route
             path="instructor-applications"

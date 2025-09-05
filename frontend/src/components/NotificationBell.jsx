@@ -3,6 +3,7 @@ import { FiBell, FiCheck, FiTrash2, FiX, FiEye, FiClock } from 'react-icons/fi';
 import { MdNotifications, MdNotificationsNone } from 'react-icons/md';
 import api from '../utils/api';
 import { useAlert } from '../contexts/AlertContext';
+import { io } from 'socket.io-client';
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
@@ -166,6 +167,8 @@ const NotificationBell = () => {
         return '👋';
       case 'system_announcement':
         return '📢';
+      case 'workout_gif_uploaded':
+        return '💪';
       default:
         return '🔔';
     }
@@ -182,6 +185,47 @@ const NotificationBell = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Socket.IO connection for real-time notifications
+  useEffect(() => {
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const socket = io(`${apiBase}/notifications`);
+    
+    socket.on('connect', () => {
+      console.log('🔌 Connected to notification socket');
+    });
+    
+    socket.on('workoutAdded', (notification) => {
+      console.log('💪 Received workout notification:', notification);
+      
+      // Add new notification to the top of the list
+      const newNotification = {
+        _id: Date.now().toString(), // Temporary ID
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        data: notification.data,
+        link: notification.link,
+        read: false,
+        createdAt: new Date(),
+        sender: null
+      };
+      
+      setNotifications(prev => [newNotification, ...prev]);
+      setUnreadCount(prev => prev + 1);
+      
+      // Show alert
+      showAlert(notification.message, 'success');
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('🔌 Disconnected from notification socket');
+    });
+    
+    return () => {
+      socket.disconnect();
+    };
+  }, [showAlert]);
 
   // Initial fetch
   useEffect(() => {
