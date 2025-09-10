@@ -54,6 +54,7 @@ function RegisterGym() {
     termsAccepted: false,
     privacyAccepted: false,
     paymentMethod: "", // Added for registration fee payment method
+    selectedWorkouts: [],
   });
 
   const [errors, setErrors] = useState({});
@@ -243,6 +244,21 @@ function RegisterGym() {
     }));
   };
 
+  const toggleWorkoutSelection = (workoutId) => {
+    setFormData((prev) => {
+      const isSelected = prev.selectedWorkouts.includes(workoutId);
+      return {
+        ...prev,
+        selectedWorkouts: isSelected
+          ? prev.selectedWorkouts.filter((id) => id !== workoutId)
+          : [...prev.selectedWorkouts, workoutId],
+      };
+    });
+    if (errors.selectedWorkouts) {
+      setErrors((prev) => ({ ...prev, selectedWorkouts: "" }));
+    }
+  };
+
   // Fetch workouts when user reaches step 2
   useEffect(() => {
     const fetchWorkouts = async () => {
@@ -293,9 +309,9 @@ function RegisterGym() {
         break;
 
       case 2: // Facilities & Classes
-        // Removed facilities validation; only classes are validated
-        if (formData.classTypes.length === 0)
-          newErrors.classTypes = "Please select at least one class type";
+        // Require at least one workout to be selected
+        if (!formData.selectedWorkouts || formData.selectedWorkouts.length === 0)
+          newErrors.selectedWorkouts = "Please select at least one workout";
         break;
 
       case 3: // Membership & Pricing
@@ -695,16 +711,32 @@ function RegisterGym() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {workouts.map((w) => (
-                    <button
+                    <div
                       key={w._id}
-                      type="button"
-                      onClick={() => setSelectedWorkout(w)}
-                      className="text-left w-full p-3 rounded-lg bg-gray-900/50 border border-gray-700 hover:bg-gray-800/60 transition-colors"
+                      className="w-full p-3 rounded-lg bg-gray-900/50 border border-gray-700 flex items-start justify-between gap-3"
                     >
-                      <span className="text-violet-300 font-medium">{w.name}</span>
-                    </button>
+                      <label className="flex items-start gap-3 cursor-pointer select-none flex-1">
+                        <input
+                          type="checkbox"
+                          checked={formData.selectedWorkouts.includes(w._id)}
+                          onChange={() => toggleWorkoutSelection(w._id)}
+                          className="mt-1"
+                        />
+                        <span className="text-violet-300 font-medium">{w.name}</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedWorkout(w)}
+                        className="text-sm text-gray-300 hover:text-white underline"
+                      >
+                        Preview
+                      </button>
+                    </div>
                   ))}
                 </div>
+              )}
+              {errors.selectedWorkouts && (
+                <p className="text-red-500 text-sm">{errors.selectedWorkouts}</p>
               )}
             </div>
 
