@@ -90,30 +90,31 @@ export const validateChangePassword = [
 
 // Gym registration validation
 export const validateGymRegistration = [
-  (req, res, next) => {
-    console.log('DEBUG - validateGymRegistration middleware called');
-    console.log('DEBUG - Request body in validation:', req.body);
-    next();
-  },
   body('gymName')
     .trim()
     .notEmpty().withMessage('Gym name is required')
     .isLength({ min: 2, max: 100 }).withMessage('Gym name must be between 2 and 100 characters'),
   
-  body('description')
+  body('gymType')
     .trim()
-    .notEmpty().withMessage('Gym description is required')
+    .notEmpty().withMessage('Gym type is required')
+    .isIn(['Fitness Center', 'Yoga Studio', 'CrossFit Box', 'Martial Arts Dojo', 'Personal Training Studio', 'Wellness Center', 'Sports Complex'])
+    .withMessage('Invalid gym type'),
+  
+  body('description')
+    .optional()
+    .trim()
     .isLength({ min: 10, max: 1000 }).withMessage('Description must be between 10 and 1000 characters'),
   
   body('contactInfo.email')
+    .optional()
     .trim()
-    .notEmpty().withMessage('Contact email is required')
     .isEmail().withMessage('Please provide a valid contact email')
     .normalizeEmail(),
   
   body('contactInfo.phone')
+    .optional()
     .trim()
-    .notEmpty().withMessage('Contact phone is required')
     .isMobilePhone().withMessage('Please provide a valid phone number'),
   
   body('contactInfo.website')
@@ -127,18 +128,22 @@ export const validateGymRegistration = [
     }),
   
   body('address.street')
+    .optional()
     .trim()
     .notEmpty().withMessage('Street address is required'),
   
   body('address.city')
+    .optional()
     .trim()
     .notEmpty().withMessage('City is required'),
   
   body('address.state')
+    .optional()
     .trim()
     .notEmpty().withMessage('State is required'),
   
   body('address.zipCode')
+    .optional()
     .trim()
     .notEmpty().withMessage('ZIP code is required'),
   
@@ -148,14 +153,23 @@ export const validateGymRegistration = [
     .notEmpty().withMessage('Country cannot be empty'),
   
   body('coordinates')
+    .optional()
     .custom((value, { req }) => {
       console.log('DEBUG - Validating coordinates:', value);
-      console.log('DEBUG - Request body keys:', Object.keys(req.body));
-      console.log('DEBUG - Full request body:', req.body);
+      console.log('DEBUG - Coordinates type:', typeof value);
+      console.log('DEBUG - Is array?', Array.isArray(value));
+      if (Array.isArray(value)) {
+        console.log('DEBUG - Array length:', value.length);
+        console.log('DEBUG - First element type:', typeof value[0]);
+        console.log('DEBUG - Second element type:', typeof value[1]);
+      }
       return true;
     })
     .isArray({ min: 2, max: 2 }).withMessage('Location coordinates must be an array of [longitude, latitude]')
     .custom((value) => {
+      if (!Array.isArray(value) || value.length !== 2) {
+        throw new Error('Coordinates must be an array of [longitude, latitude]');
+      }
       const [lng, lat] = value;
       if (typeof lng !== 'number' || typeof lat !== 'number') {
         throw new Error('Coordinates must be numbers');
@@ -216,7 +230,7 @@ export const validateGymRegistration = [
     .isFloat({ min: 0 }).withMessage('Drop-in fee must be a non-negative number'),
   
   body('capacity')
-    .notEmpty().withMessage('Gym capacity is required')
+    .optional()
     .isInt({ min: 1 }).withMessage('Capacity must be at least 1'),
   
   body('establishedYear')
@@ -234,7 +248,90 @@ export const validateGymRegistration = [
   
   body('tags')
     .optional()
-    .isArray().withMessage('Tags must be an array')
+    .isArray().withMessage('Tags must be an array'),
+
+  // New validation fields for comprehensive gym registration
+  body('selectedWorkouts')
+    .optional()
+    .isArray().withMessage('Selected workouts must be an array'),
+
+  body('selectedWorkouts.*')
+    .optional()
+    .custom((value) => {
+      // Allow empty strings or valid MongoDB ObjectIds
+      if (value === '' || value === null || value === undefined) {
+        return true;
+      }
+      // Check if it's a valid MongoDB ObjectId (24 hex characters)
+      if (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value)) {
+        return true;
+      }
+      return false;
+    })
+    .withMessage('Invalid workout ID'),
+
+  body('paymentMethods')
+    .optional()
+    .isArray().withMessage('Payment methods must be an array'),
+
+  body('paymentMethods.*')
+    .optional()
+    .isIn(['Credit Cards', 'Debit Cards', 'Bank Transfer', 'Cash', 'Digital Wallets', 'Automatic Payments'])
+    .withMessage('Invalid payment method'),
+
+  body('paymentProcessor')
+    .optional()
+    .custom((value) => {
+      // Allow empty string or valid enum values
+      if (value === '' || value === null || value === undefined) {
+        return true;
+      }
+      return ['Stripe', 'PayPal', 'Square', 'Other'].includes(value);
+    })
+    .withMessage('Invalid payment processor'),
+
+  body('promotions')
+    .optional()
+    .trim()
+    .isLength({ max: 500 }).withMessage('Promotions cannot exceed 500 characters'),
+
+  body('socialMedia.facebook')
+    .optional()
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid Facebook URL');
+      }
+      return true;
+    }),
+
+  body('socialMedia.instagram')
+    .optional()
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid Instagram URL');
+      }
+      return true;
+    }),
+
+  body('socialMedia.twitter')
+    .optional()
+    .trim()
+    .custom((value) => {
+      if (value && value.length > 0 && !value.match(/^https?:\/\/.+/)) {
+        throw new Error('Please provide a valid Twitter URL');
+      }
+      return true;
+    }),
+
+  body('registrationFee.amount')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('Registration fee amount must be a non-negative number'),
+
+  body('registrationFee.currency')
+    .optional()
+    .isIn(['USD', 'LKR', 'EUR', 'GBP']).withMessage('Invalid currency')
 ];
 
 // Gym update validation (less strict than registration)

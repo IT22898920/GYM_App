@@ -5,6 +5,7 @@ import { sendGymApprovalEmail, sendGymRejectionEmail, sendGymPendingEmail } from
 import { deleteFromCloudinary } from '../config/cloudinary.js';
 import NotificationService from '../services/notificationService.js';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 
 // Upload gym logo
 export const uploadGymLogo = async (req, res) => {
@@ -133,13 +134,9 @@ export const uploadGymImages = async (req, res) => {
 // Create a new gym
 export const createGym = async (req, res) => {
   try {
-    console.log('DEBUG - Full request body:', JSON.stringify(req.body, null, 2));
-    console.log('DEBUG - Coordinates in body:', req.body.coordinates);
-    console.log('DEBUG - Coordinates type:', typeof req.body.coordinates);
-    console.log('DEBUG - Is array?', Array.isArray(req.body.coordinates));
-    
     const {
       gymName,
+      gymType,
       description,
       contactInfo,
       address,
@@ -149,7 +146,13 @@ export const createGym = async (req, res) => {
       operatingHours,
       capacity,
       establishedYear,
-      tags
+      tags,
+      selectedWorkouts,
+      paymentMethods,
+      paymentProcessor,
+      promotions,
+      socialMedia,
+      registrationFee
     } = req.body;
 
     // Ensure user is a gym owner or admin
@@ -157,6 +160,14 @@ export const createGym = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Only gym owners can create gyms'
+      });
+    }
+
+    // Basic validation
+    if (!gymName || !gymType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gym name and type are required'
       });
     }
 
@@ -169,9 +180,23 @@ export const createGym = async (req, res) => {
       });
     }
 
+    // Convert selectedWorkouts string IDs to ObjectIds
+    const workoutObjectIds = selectedWorkouts && selectedWorkouts.length > 0 
+      ? selectedWorkouts.filter(id => id && id.trim() !== '').map(id => {
+          try {
+            return new mongoose.Types.ObjectId(id);
+          } catch (error) {
+            console.warn('Invalid workout ID:', id, error.message);
+            return null;
+          }
+        }).filter(id => id !== null)
+      : [];
+
+
     // Create new gym
     const newGym = new Gym({
       gymName,
+      gymType,
       description,
       owner: req.user.id,
       contactInfo,
@@ -186,6 +211,18 @@ export const createGym = async (req, res) => {
       capacity,
       establishedYear,
       tags,
+      selectedWorkouts: workoutObjectIds,
+      paymentMethods: paymentMethods || [],
+      paymentProcessor,
+      promotions,
+      socialMedia: socialMedia || {},
+      registrationFee: {
+        amount: registrationFee?.amount || 20,
+        currency: registrationFee?.currency || 'USD',
+        paid: registrationFee?.paid || false,
+        paymentMethod: registrationFee?.paymentMethod,
+        paidAt: registrationFee?.paid ? new Date() : undefined
+      },
       status: 'pending',
       verificationStatus: 'pending',
       isActive: false // Will be activated after approval
