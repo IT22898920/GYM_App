@@ -54,6 +54,7 @@ import UpdateLocation from "./pages/gymowner/UpdateLocation";
 import ContactInfo from "./pages/gymowner/ContactInfo";
 import GymOwnerMessages from "./pages/gymowner/Messages";
 import BankAccount from "./pages/gymowner/BankAccount";
+import GymOwnerFacilities from "./pages/gymowner/Facilities";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -86,6 +87,7 @@ import FinanceAdmin from "./pages/admin/Finance";
 import CustomerRegisterGym from "./pages/CustomerRegisterGym";
 import GymRegistrations from "./pages/admin/GymRegistrations";
 import Gif from "./pages/admin/Gif";
+import AdminFacilities from "./pages/admin/Facilities";
 
 
 function App() {
@@ -130,6 +132,7 @@ function AppContent() {
           <Route path="finance" element={<FinanceAdmin />} />
           <Route path="gym-registrations" element={<GymRegistrations />} />
           <Route path="facilities" element={<Gif />} />
+          <Route path="gym-workouts" element={<AdminFacilities />} />
 
           <Route
             path="instructor-applications"
@@ -160,6 +163,7 @@ function AppContent() {
           <Route path="manage-images" element={<ManageImages />} />
           <Route path="update-location" element={<UpdateLocation />} />
           <Route path="contact-info" element={<ContactInfo />} />
+          <Route path="facilities" element={<GymOwnerFacilities />} />
           <Route path="messages" element={<GymOwnerMessages />} />
           <Route path="bank-account" element={<BankAccount />} />
 

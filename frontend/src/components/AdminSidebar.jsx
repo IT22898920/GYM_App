@@ -180,6 +180,11 @@ function AdminSidebar({ isOpen }) {
         path: "/gym-owner/messages",
         badge: "5",
       },
+      {
+        title: "Facilities",
+        icon: FiFileText,
+        path: "/gym-owner/facilities",
+      },
     ],
     instructor: [
       {

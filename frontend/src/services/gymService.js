@@ -316,6 +316,22 @@ export const formatGymDataForAPI = (formData) => {
   return apiData;
 };
 
+// Workouts (Facilities) management
+export const getGymWorkouts = async (gymId) => {
+  const res = await api.get(`/gyms/${gymId}/workouts`);
+  return res.data;
+};
+
+export const addGymWorkouts = async (gymId, workoutIds) => {
+  const res = await api.post(`/gyms/${gymId}/workouts`, { workoutIds });
+  return res.data;
+};
+
+export const removeGymWorkout = async (gymId, workoutId) => {
+  const res = await api.delete(`/gyms/${gymId}/workouts/${encodeURIComponent(workoutId)}`);
+  return res.data;
+};
+
 // Helper function to validate URL
 const isValidUrl = (string) => {
   if (!string || !string.trim()) return false;

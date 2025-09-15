@@ -28,6 +28,7 @@ import { protect, authorize, optionalAuth } from '../middleware/auth.js';
 import { validateGymRegistration, validateGymUpdate, validateBankAccount } from '../middleware/validation.js';
 import { handleValidationErrors } from '../middleware/errorHandler.js';
 import { uploadGymImages as uploadGymImagesMiddleware, uploadGymImagesToCloudinary, uploadLogo, uploadGymLogoToCloudinary, handleUploadError, uploadInstructorFiles, uploadInstructorFilesToCloudinary } from '../middleware/upload.js';
+import { getGymWorkouts, addGymWorkouts, removeGymWorkout } from '../controllers/gymController.js';
 
 const router = express.Router();
 
@@ -62,6 +63,11 @@ router.get('/:gymId/instructors', authorize('gymOwner', 'admin'), getGymInstruct
 router.post('/:gymId/instructors', authorize('gymOwner', 'admin'), addInstructorToGym);
 router.put('/:gymId/instructors/:instructorId', authorize('gymOwner', 'admin'), updateInstructorInGym);
 router.delete('/:gymId/instructors/:instructorId', authorize('gymOwner', 'admin'), removeInstructorFromGym);
+
+// Gym workouts management
+router.get('/:id/workouts', authorize('customer', 'gymOwner', 'admin'), getGymWorkouts);
+router.post('/:id/workouts', authorize('gymOwner', 'admin'), addGymWorkouts);
+router.delete('/:id/workouts/:workoutId', authorize('gymOwner', 'admin'), removeGymWorkout);
 
 // Admin only routes
 router.get('/admin/pending', authorize('admin'), getPendingGyms);
