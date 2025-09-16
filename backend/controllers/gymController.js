@@ -547,6 +547,7 @@ export const approveGym = async (req, res) => {
       {
         status: 'approved',
         verificationStatus: 'verified',
+        isActive: true,
         adminNotes: adminNotes || '',
         updatedAt: Date.now()
       },

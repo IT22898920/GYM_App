@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { FiPlus, FiX, FiRefreshCw } from "react-icons/fi";
 import axios from "axios";
+import { useAlert } from "../../contexts/AlertContext";
 import { getGymWorkouts, addGymWorkouts, removeGymWorkout } from "../../services/gymService";
 
 function GymOwnerFacilities() {
+  const { showSuccess, showError } = useAlert();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -52,9 +54,11 @@ function GymOwnerFacilities() {
       await addGymWorkouts(gymId, selectedToAdd);
       setSelectedToAdd([]);
       await loadGym();
+      showSuccess("Workouts added successfully", { position: 'top-right' });
     } catch (e) {
       console.error(e);
       setError(e.response?.data?.message || "Failed to add workouts");
+      showError(e.response?.data?.message || "Failed to add workouts", { position: 'top-right' });
     } finally {
       setSaving(false);
     }
@@ -66,9 +70,11 @@ function GymOwnerFacilities() {
       setSaving(true);
       await removeGymWorkout(gymId, workoutId);
       await loadGym();
+      showSuccess("Workout removed successfully", { position: 'top-right' });
     } catch (e) {
       console.error(e);
       setError(e.response?.data?.message || "Failed to remove workout");
+      showError(e.response?.data?.message || "Failed to remove workout", { position: 'top-right' });
     } finally {
       setSaving(false);
     }

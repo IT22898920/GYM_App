@@ -1078,6 +1078,11 @@ function RegisterGym() {
                   onLocationChange={handleLocationChange}
                 />
               </div>
+              {/* Debug info for Google Maps */}
+              <div className="text-xs text-gray-500 mt-2">
+                <div>Debug: location lat/lng → {String(formData.location?.lat)} , {String(formData.location?.lng)}</div>
+                <div>Debug: maps loaded → {String(!!window.google && !!window.google.maps)}</div>
+              </div>
             </div>
           </div>
         );
