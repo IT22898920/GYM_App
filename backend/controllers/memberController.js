@@ -442,7 +442,7 @@ export const addMember = async (req, res) => {
 export const getMembers = async (req, res) => {
   try {
     const gymOwnerId = req.user.id;
-    const { page = 1, limit = 10, search = '', status = 'all' } = req.query;
+    const { page = 1, limit = 10, search = '', status = 'all', instructorId } = req.query;
 
     // Find the gym
     const gym = await Gym.findOne({ owner: gymOwnerId, status: 'approved' });
@@ -466,6 +466,11 @@ export const getMembers = async (req, res) => {
         { lastName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } }
       ];
+    }
+
+    // Optional filter by assigned instructor
+    if (instructorId) {
+      query.assignedInstructor = instructorId;
     }
 
     // Get total count

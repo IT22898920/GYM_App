@@ -140,6 +140,11 @@ function AdminSidebar({ isOpen }) {
         path: "/gym-owner/members",
       },
       {
+        title: "Instructor Members",
+        icon: FiUsers,
+        path: "/gym-owner/instructor-members",
+      },
+      {
         title: "Your Gym's Instructors",
         icon: FiUserPlus,
         path: "/gym-owner/instructors",

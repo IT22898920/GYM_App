@@ -55,6 +55,7 @@ import ContactInfo from "./pages/gymowner/ContactInfo";
 import GymOwnerMessages from "./pages/gymowner/Messages";
 import BankAccount from "./pages/gymowner/BankAccount";
 import GymOwnerFacilities from "./pages/gymowner/Facilities";
+import InstructorMembers from "./pages/gymowner/InstructorMembers";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -152,6 +153,7 @@ function AppContent() {
           <Route path="instructors/:instructorId/edit" element={<EditInstructor />} />
           <Route path="classes" element={<GymOwnerClasses />} />
           <Route path="members" element={<GymOwnerMembers />} />
+          <Route path="instructor-members" element={<InstructorMembers />} />
           <Route path="settings" element={<GymOwnerSettings />} />
           <Route path="profile" element={<Profile />} />
           <Route path="addInstructor" element={<AddInstructor />} />
