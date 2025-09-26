@@ -7,6 +7,7 @@ import NotificationService from '../services/notificationService.js';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import Gif from '../models/Gif.js';
+import CollaborationRequest from '../models/CollaborationRequest.js';
 
 // Upload gym logo
 export const uploadGymLogo = async (req, res) => {
@@ -153,7 +154,8 @@ export const createGym = async (req, res) => {
       paymentProcessor,
       promotions,
       socialMedia,
-      registrationFee
+      registrationFee,
+      pricing
     } = req.body;
 
     // Ensure user is a gym owner or admin
@@ -222,6 +224,10 @@ export const createGym = async (req, res) => {
       paymentProcessor: normalizedPaymentProcessor,
       promotions,
       socialMedia: socialMedia || {},
+      pricing: pricing || {
+        membershipPlans: [],
+        dropInFee: 0
+      },
       registrationFee: {
         amount: registrationFee?.amount || 20,
         currency: registrationFee?.currency || 'USD',
@@ -906,6 +912,102 @@ export const removeInstructorFromGym = async (req, res) => {
   }
 };
 
+// Search available instructors for a gym (exclude already added)
+export const searchAvailableInstructors = async (req, res) => {
+  try {
+    const { gymId } = req.params;
+    const { search, specialization } = req.query;
+
+    // Validate gym exists and requester is owner/admin
+    const gym = await Gym.findById(gymId).select('owner instructors');
+    if (!gym) {
+      return res.status(404).json({ success: false, message: 'Gym not found' });
+    }
+
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    // Build base filter: active instructors
+    const userFilter = { role: 'instructor', isActive: true };
+
+    if (specialization && specialization !== 'all') {
+      userFilter.$or = [
+        { specialization: { $regex: specialization, $options: 'i' } },
+        { 'application.specialization': { $regex: specialization, $options: 'i' } }
+      ];
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      userFilter.$or = [
+        ...(userFilter.$or || []),
+        { firstName: { $regex: searchRegex } },
+        { lastName: { $regex: searchRegex } },
+        { email: { $regex: searchRegex } }
+      ];
+    }
+
+    // Exclude instructors already in this gym
+    const existingInstructorIds = (gym.instructors || []).map(inst => inst.instructor?.toString());
+
+    // Fetch instructors from approved freelance applications to prioritize candidates
+    const freelanceApplications = await InstructorApplication.find({
+      status: 'approved',
+      isFreelance: true
+    })
+      .populate('applicant', '-password -refreshToken')
+      .select('specialization experience preferredLocation availability profilePicture certifications resume isFreelance motivation applicant');
+
+    // Map to unified list and apply filters
+    let candidates = freelanceApplications
+      .map(app => ({
+        _id: app.applicant?._id,
+        firstName: app.applicant?.firstName,
+        lastName: app.applicant?.lastName,
+        email: app.applicant?.email,
+        phone: app.applicant?.phone,
+        specialization: app.specialization,
+        experience: app.experience,
+        applicationDetails: {
+          specialization: app.specialization,
+          experience: app.experience,
+          preferredLocation: app.preferredLocation,
+          availability: app.availability,
+          profilePicture: app.profilePicture,
+          certifications: app.certifications,
+          resume: app.resume,
+          isFreelance: app.isFreelance,
+          motivation: app.motivation
+        }
+      }))
+      .filter(c => c._id);
+
+    if (specialization && specialization !== 'all') {
+      const specRegex = new RegExp(specialization, 'i');
+      candidates = candidates.filter(c => specRegex.test(c.specialization || ''));
+    }
+
+    if (search && search.trim()) {
+      const r = new RegExp(search.trim(), 'i');
+      candidates = candidates.filter(c => r.test(c.firstName || '') || r.test(c.lastName || '') || r.test(c.email || ''));
+    }
+
+    // Remove already added to this gym
+    candidates = candidates.filter(c => !existingInstructorIds.includes(c._id.toString()));
+
+    // Exclude instructors with already accepted collaboration with this gym
+    const acceptedCollabs = await CollaborationRequest.find({ gym: gymId, status: 'accepted' }).select('toInstructor');
+    const acceptedIds = new Set(acceptedCollabs.map(cr => cr.toInstructor.toString()));
+    candidates = candidates.filter(c => !acceptedIds.has(c._id.toString()));
+
+    return res.status(200).json({ success: true, data: candidates });
+  } catch (error) {
+    console.error('Error searching available instructors:', error);
+    return res.status(500).json({ success: false, message: 'Failed to search instructors', error: error.message });
+  }
+};
+
 // Update instructor in gym
 export const updateInstructorInGym = async (req, res) => {
   try {
@@ -1071,16 +1173,13 @@ export const registerInstructorForGym = async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
     // Create new instructor user
     const newInstructor = new User({
       email,
       firstName,
       lastName,
       phone,
-      password: hashedPassword,
+      password,
       role: 'instructor',
       specialization,
       experience,

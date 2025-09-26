@@ -404,6 +404,7 @@ export const addMember = async (req, res) => {
         method: memberData.paymentDetails?.paymentMethod || 'manual',
         paymentStatus: 'paid'
       },
+      status: 'active',
       createdBy: gymOwnerId
     });
 

@@ -227,18 +227,23 @@ export default function AddMemberForm() {
         }
 
         const data = await response.json();
-        setMembershipPlans(data.data.membershipPlans);
+        console.log('Membership plans fetched:', data); // Debug log
         
-        // Set the first plan as default
-        if (data.data.membershipPlans.length > 0) {
+        // Ensure we set empty array if undefined
+        const plans = data.data?.membershipPlans || [];
+        setMembershipPlans(plans);
+        
+        // Set the first plan as default if plans exist
+        if (plans.length > 0) {
           setFormData(prev => ({
             ...prev,
-            membershipPlan: data.data.membershipPlans[0].name
+            membershipPlan: plans[0].name
           }));
         }
       } catch (error) {
         console.error('Error fetching membership plans:', error);
         showAlert('error', 'Failed to load membership plans');
+        setMembershipPlans([]);
       }
     };
 
@@ -333,7 +338,9 @@ export default function AddMemberForm() {
         ...formData,
         membershipPrice: selectedPlanDetails.price,
         membershipFeatures: selectedPlanDetails.benefits || selectedPlanDetails.features || [],
-        paymentDetails
+        paymentDetails: {
+          paymentMethod: paymentDetails.paymentMethod
+        }
       };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/members`, {
@@ -754,8 +761,23 @@ export default function AddMemberForm() {
               </h3>
               {membershipPlans.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600 mx-auto mb-4"></div>
-                  <p className="text-gray-400">Loading membership plans...</p>
+                  <div className="text-gray-400 mb-3">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-medium text-white mb-2">No Membership Plans Found</h4>
+                  <p className="text-gray-400 mb-4">
+                    Membership plans have not been configured for this gym yet.
+                  </p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Please contact the gym administrator to set up membership plans first before adding members.
+                  </p>
+                  <div className="text-sm bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3">
+                    <p className="text-yellow-300">
+                      Go to "Gym Settings" to add membership plans
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -781,7 +803,7 @@ export default function AddMemberForm() {
                       <div className="text-2xl font-bold text-white mt-2">
                         ${plan.price}
                         <span className="text-sm font-normal text-gray-400">
-                          /month
+                          /{plan.duration}
                         </span>
                       </div>
                       <div className="text-sm text-gray-400 mt-2">

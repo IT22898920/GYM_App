@@ -22,7 +22,8 @@ import {
   getBankAccount,
   deleteBankAccount,
   getPendingGyms,
-  toggleGymStatus
+  toggleGymStatus,
+  searchAvailableInstructors
 } from '../controllers/gymController.js';
 import { protect, authorize, optionalAuth } from '../middleware/auth.js';
 import { validateGymRegistration, validateGymUpdate, validateBankAccount } from '../middleware/validation.js';
@@ -60,6 +61,7 @@ router.delete('/:id/bank-account', authorize('gymOwner', 'admin'), deleteBankAcc
 // Instructor management routes for gym owners
 // Note: More specific routes must come before general ones
 router.get('/:gymId/instructors', authorize('gymOwner', 'admin'), getGymInstructors);
+router.get('/:gymId/instructors/search', authorize('gymOwner', 'admin'), searchAvailableInstructors);
 router.post('/:gymId/instructors', authorize('gymOwner', 'admin'), addInstructorToGym);
 router.put('/:gymId/instructors/:instructorId', authorize('gymOwner', 'admin'), updateInstructorInGym);
 router.delete('/:gymId/instructors/:instructorId', authorize('gymOwner', 'admin'), removeInstructorFromGym);

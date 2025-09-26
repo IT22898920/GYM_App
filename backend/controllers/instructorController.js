@@ -1,5 +1,8 @@
 import InstructorApplication from '../models/InstructorApplication.js';
 import User from '../models/User.js';
+import Member from '../models/Member.js';
+import Gym from '../models/Gym.js';
+import MemberWorkoutPlan from '../models/MemberWorkoutPlan.js';
 import { deleteFromCloudinary } from '../config/cloudinary.js';
 import NotificationService from '../services/notificationService.js';
 
@@ -771,6 +774,133 @@ export const getFreelanceInstructors = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch freelance instructors',
+      error: error.message
+    });
+  }
+};
+
+// Get members assigned to instructor
+export const getAssignedMembers = async (req, res) => {
+  try {
+    const instructorId = req.user.id;
+    const { page = 1, limit = 10, search = '', status = 'all' } = req.query;
+
+    // Build query
+    const query = { assignedInstructor: instructorId };
+    
+    if (status !== 'all') {
+      query.status = status;
+    }
+    
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get total count
+    const totalMembers = await Member.countDocuments(query);
+
+    // Get paginated members
+    const members = await Member.find(query)
+      .populate('user', 'firstName lastName email')
+      .populate('gym', 'gymName')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    res.status(200).json({
+      success: true,
+      data: members,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalMembers / limit),
+        totalMembers,
+        hasNextPage: page * limit < totalMembers,
+        hasPrevPage: page > 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching assigned members:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch assigned members',
+      error: error.message
+    });
+  }
+};
+
+// Create workout plan for student
+export const createWorkoutPlan = async (req, res) => {
+  try {
+    const instructorId = req.user.id;
+    const { 
+      studentId, 
+      planName, 
+      startDate, 
+      endDate, 
+      type, 
+      description, 
+      schedule 
+    } = req.body;
+
+    // Validate required fields
+    if (!studentId || !planName || !startDate || !endDate || !type) {
+      return res.status(400).json({
+        success: false,
+        message: 'Required fields: studentId, planName, startDate, endDate, and type'
+      });
+    }
+
+    // Verify the member is assigned to this instructor
+    const member = await Member.findById(studentId);
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found'
+      });
+    }
+
+    if (member.assignedInstructor.toString() !== instructorId) {
+      return res.status(403).json({
+        success: false,
+        message: 'This member is not assigned to you'
+      });
+    }
+
+    // Create workout plan
+    const workoutPlan = new MemberWorkoutPlan({
+      instructor: instructorId,
+      student: studentId,
+      planName,
+      type,
+      description,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      schedule: schedule || []
+    });
+
+    await workoutPlan.save();
+
+    // Populate references for response
+    const populatedPlan = await MemberWorkoutPlan.findById(workoutPlan._id)
+      .populate('student', 'firstName lastName email')
+      .populate('instructor', 'firstName lastName');
+
+    res.status(201).json({
+      success: true,
+      message: 'Workout plan created successfully',
+      data: populatedPlan
+    });
+
+  } catch (error) {
+    console.error('Error creating workout plan:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create workout plan',
       error: error.message
     });
   }

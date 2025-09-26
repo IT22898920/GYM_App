@@ -245,10 +245,10 @@ export const uploadGifToCloudinary = async (req, res, next) => {
 // Helper function to upload document to Cloudinary
 export const uploadDocumentToCloudinary = async (file) => {
   try {
+    // Use raw resource type for documents to avoid strict format rejections
     const result = await uploadToCloudinary(file.buffer, {
-      resource_type: 'auto', // Auto detect file type
-      folder: 'instructor-documents',
-      allowed_formats: ['pdf', 'doc', 'docx']
+      resource_type: 'raw',
+      folder: 'instructor-documents'
     });
     
     return {
