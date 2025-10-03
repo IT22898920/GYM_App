@@ -68,6 +68,7 @@ const notificationSchema = new mongoose.Schema({
       'member_joined_gym',
       'member_left_gym',
       'instructor_assigned',
+      'member_assigned',
       'membership_expiring',
       'membership_expired',
       

@@ -650,6 +650,20 @@ export const assignInstructor = async (req, res) => {
       });
     }
 
+    // Send notification to instructor
+    await NotificationService.createNotification({
+      recipient: instructorId,
+      sender: gymOwnerId,
+      type: 'member_assigned',
+      title: 'New Member Assigned',
+      message: `You have been assigned a new member: ${member.firstName} ${member.lastName}`,
+      data: {
+        instructorId: instructor._id,
+        memberId: member._id,
+        memberName: `${member.firstName} ${member.lastName}`
+      }
+    });
+
     res.status(200).json({
       success: true,
       message: 'Instructor assigned successfully',
