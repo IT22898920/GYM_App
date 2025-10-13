@@ -774,6 +774,27 @@ class ApiService {
     
     return this.handleResponse(response);
   }
+
+  // Customer Profile endpoints
+  async getMyProfile() {
+    const response = await fetch(`${this.baseURL}/members/my-profile`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getMyWorkoutPlans() {
+    const response = await fetch(`${this.baseURL}/members/my-workout-plans`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
 }
 
 // Create and export a single instance

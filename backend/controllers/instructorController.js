@@ -905,3 +905,49 @@ export const createWorkoutPlan = async (req, res) => {
     });
   }
 };
+
+// Get instructor's gym and available exercises
+export const getInstructorGymExercises = async (req, res) => {
+  try {
+    const instructorId = req.user.id;
+
+    // Find the gym where this instructor is registered
+    const gym = await Gym.findOne({
+      'instructors.instructor': instructorId,
+      'instructors.isActive': true
+    }).populate('selectedWorkouts', 'name url');
+
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'No active gym found for this instructor'
+      });
+    }
+
+    // Extract exercise names from selectedWorkouts (GIFs)
+    const exercises = gym.selectedWorkouts.map(workout => ({
+      id: workout._id,
+      name: workout.name,
+      url: workout.url
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        gym: {
+          id: gym._id,
+          name: gym.gymName
+        },
+        exercises: exercises
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching instructor gym exercises:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch gym exercises',
+      error: error.message
+    });
+  }
+};

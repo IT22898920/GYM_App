@@ -62,10 +62,13 @@ function CreateWorkoutPlan() {
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [gymExercises, setGymExercises] = useState([]);
+  const [loadingExercises, setLoadingExercises] = useState(false);
 
-  // Fetch assigned members on component mount
+  // Fetch assigned members and gym exercises on component mount
   useEffect(() => {
     fetchAssignedMembers();
+    fetchGymExercises();
   }, []);
 
   const fetchAssignedMembers = async () => {
@@ -94,6 +97,30 @@ function CreateWorkoutPlan() {
       console.error('Error fetching assigned members:', error);
     } finally {
       setLoadingStudents(false);
+    }
+  };
+
+  const fetchGymExercises = async () => {
+    try {
+      setLoadingExercises(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/instructors/gym-exercises`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch gym exercises');
+      }
+
+      const data = await response.json();
+      setGymExercises(data.data.exercises || []);
+    } catch (error) {
+      console.error('Error fetching gym exercises:', error);
+      // Don't show error to user, just set empty array
+      setGymExercises([]);
+    } finally {
+      setLoadingExercises(false);
     }
   };
 
@@ -665,7 +692,12 @@ function CreateWorkoutPlan() {
                 {/* Workouts Section */}
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-medium text-white">Workouts</h4>
+                    <div>
+                      <h4 className="text-lg font-medium text-white">Workouts</h4>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Exercises are loaded from your gym's available workouts
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => addExercise(blockIndex)}
@@ -684,8 +716,7 @@ function CreateWorkoutPlan() {
                       >
                         {/* Exercise Name */}
                         <div className="md:col-span-2">
-                          <input
-                            type="text"
+                          <select
                             value={exercise.name}
                             onChange={(e) =>
                               handleExerciseChange(
@@ -696,8 +727,19 @@ function CreateWorkoutPlan() {
                               )
                             }
                             className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                            placeholder="Exercise name"
-                          />
+                            disabled={loadingExercises}
+                          >
+                            <option value="">
+                              {loadingExercises ? "Loading exercises..." : 
+                               gymExercises.length === 0 ? "No exercises available" : 
+                               "Select exercise"}
+                            </option>
+                            {gymExercises.map((exerciseOption) => (
+                              <option key={exerciseOption.id} value={exerciseOption.name}>
+                                {exerciseOption.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         {/* Sets */}

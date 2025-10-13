@@ -1157,3 +1157,74 @@ export const confirmCustomerPayment = async (req, res) => {
     });
   }
 };
+
+// Get customer's own profile (for logged-in customers)
+export const getMyProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find the member record for this user
+    const member = await Member.findOne({ user: userId })
+      .populate('gym', 'gymName name location address pricing')
+      .populate('assignedInstructor', 'firstName lastName email phoneNumber specialization')
+      .populate('user', 'firstName lastName email phoneNumber');
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member profile not found. You may not be registered at any gym yet.'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: member
+    });
+
+  } catch (error) {
+    console.error('Error fetching customer profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch profile',
+      error: error.message
+    });
+  }
+};
+
+// Get customer's workout plans (for logged-in customers)
+export const getMyWorkoutPlans = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find the member record for this user
+    const member = await Member.findOne({ user: userId });
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member profile not found'
+      });
+    }
+
+    // Import MemberWorkoutPlan model
+    const MemberWorkoutPlan = (await import('../models/MemberWorkoutPlan.js')).default;
+
+    // Find all workout plans assigned to this member
+    const workoutPlans = await MemberWorkoutPlan.find({ student: member._id })
+      .populate('instructor', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: workoutPlans
+    });
+
+  } catch (error) {
+    console.error('Error fetching workout plans:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch workout plans',
+      error: error.message
+    });
+  }
+};

@@ -13,7 +13,8 @@ import {
   getInstructorById,
   getFreelanceInstructors,
   getAssignedMembers,
-  createWorkoutPlan
+  createWorkoutPlan,
+  getInstructorGymExercises
 } from '../controllers/instructorController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { handleValidationErrors } from '../middleware/errorHandler.js';
@@ -39,6 +40,7 @@ router.post(
 // All specific routes MUST come before parameterized routes
 router.get('/my-applications', getMyApplications);
 router.get('/assigned-members', authorize('instructor'), getAssignedMembers);
+router.get('/gym-exercises', authorize('instructor'), getInstructorGymExercises);
 router.post('/workout-plan', authorize('instructor'), createWorkoutPlan);
 
 // Admin only routes - specific paths

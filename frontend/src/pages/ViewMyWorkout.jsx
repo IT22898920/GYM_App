@@ -13,150 +13,81 @@ import {
   FiChevronDown,
   FiChevronUp,
 } from "react-icons/fi";
+import api from "../utils/api";
 
 function ViewMyWorkout() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample workout plans data - replace with actual data from your backend
-  const [workoutPlans, setWorkoutPlans] = useState([
-    {
-      id: 1,
-      name: "Strength Building Program",
-      instructor: {
-        name: "Sarah Johnson",
-        email: "sarah@example.com",
-      },
-      startDate: "2024-03-01",
-      endDate: "2024-04-01",
-      type: "Strength Training",
-      description:
-        "A comprehensive strength training program designed to build muscle and increase overall strength.",
-      progress: 65,
-      status: "active",
-      schedule: [
-        {
-          day: "Monday",
-          exercises: [
-            {
-              name: "Bench Press",
-              sets: "4",
-              reps: "8-10",
-              weight: "135 lbs",
-              completed: true,
-            },
-            {
-              name: "Squats",
-              sets: "4",
-              reps: "8-10",
-              weight: "185 lbs",
-              completed: false,
-            },
-          ],
-        },
-        {
-          day: "Wednesday",
-          exercises: [
-            {
-              name: "Deadlifts",
-              sets: "3",
-              reps: "8-10",
-              weight: "225 lbs",
-              completed: false,
-            },
-            {
-              name: "Pull-ups",
-              sets: "3",
-              reps: "8-10",
-              weight: "Bodyweight",
-              completed: false,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Weight Loss Program",
-      instructor: {
-        name: "Mike Chen",
-        email: "mike@example.com",
-      },
-      startDate: "2024-02-01",
-      endDate: "2024-03-01",
-      type: "HIIT",
-      description:
-        "High-intensity interval training program focused on fat loss and cardiovascular fitness.",
-      progress: 100,
-      status: "completed",
-      schedule: [
-        {
-          day: "Tuesday",
-          exercises: [
-            {
-              name: "Circuit Training",
-              duration: "30 min",
-              intensity: "High",
-              completed: true,
-            },
-          ],
-        },
-        {
-          day: "Thursday",
-          exercises: [
-            {
-              name: "Cardio Intervals",
-              duration: "45 min",
-              intensity: "High",
-              completed: true,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Flexibility Program",
-      instructor: {
-        name: "Emma Rodriguez",
-        email: "emma@example.com",
-      },
-      startDate: "2024-04-01",
-      endDate: "2024-05-01",
-      type: "Yoga",
-      description:
-        "A flexibility-focused program combining yoga and stretching exercises.",
-      progress: 0,
-      status: "upcoming",
-      schedule: [
-        {
-          day: "Monday",
-          exercises: [
-            {
-              name: "Vinyasa Flow",
-              duration: "60 min",
-              intensity: "Medium",
-              completed: false,
-            },
-          ],
-        },
-        {
-          day: "Friday",
-          exercises: [
-            {
-              name: "Power Yoga",
-              duration: "45 min",
-              intensity: "High",
-              completed: false,
-            },
-          ],
-        },
-      ],
-    },
-  ]);
+  // Workout plans data - will be populated from backend
+  const [workoutPlans, setWorkoutPlans] = useState([]);
 
+  // Fetch workout plans from backend
   useEffect(() => {
-    setIsLoaded(true);
+    const fetchWorkoutPlans = async () => {
+      try {
+        setLoading(true);
+        const response = await api.getMyWorkoutPlans();
+        
+        if (response.success) {
+          // Transform backend data to match UI structure
+          const transformedPlans = response.data.map((plan) => {
+            // Determine status based on dates
+            const now = new Date();
+            const startDate = new Date(plan.startDate);
+            const endDate = new Date(plan.endDate);
+            
+            let planStatus = plan.status;
+            if (planStatus === 'active') {
+              if (now < startDate) planStatus = 'upcoming';
+              else if (now > endDate) planStatus = 'completed';
+            }
+
+            // Calculate progress
+            const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+            const daysPassed = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24));
+            const progress = planStatus === 'completed' ? 100 : 
+                           planStatus === 'upcoming' ? 0 : 
+                           Math.min(100, Math.max(0, Math.round((daysPassed / totalDays) * 100)));
+
+            return {
+              id: plan._id,
+              name: plan.planName,
+              instructor: {
+                name: plan.instructor ? 
+                  `${plan.instructor.firstName} ${plan.instructor.lastName}` : 
+                  'Unknown Instructor',
+                email: plan.instructor?.email || '',
+              },
+              startDate: plan.startDate,
+              endDate: plan.endDate,
+              type: plan.type,
+              description: plan.description || 'No description provided',
+              progress: progress,
+              status: planStatus,
+              schedule: plan.schedule?.map(scheduleItem => ({
+                day: scheduleItem.days?.join(', ') || 'Unscheduled',
+                exercises: scheduleItem.exercises || [],
+                meals: scheduleItem.meals || [],
+                supplements: scheduleItem.supplements || [],
+              })) || [],
+            };
+          });
+
+          setWorkoutPlans(transformedPlans);
+        }
+      } catch (err) {
+        console.error('Error fetching workout plans:', err);
+        setError(err.message || 'Failed to load workout plans');
+      } finally {
+        setLoading(false);
+        setIsLoaded(true);
+      }
+    };
+
+    fetchWorkoutPlans();
   }, []);
 
   const toggleExerciseCompletion = (planId, dayIndex, exerciseIndex) => {
@@ -247,6 +178,36 @@ function ViewMyWorkout() {
     }
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-violet-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading your workout plans...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-xl mb-4">⚠️ Error</div>
+          <p className="text-gray-400">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 py-20 relative overflow-hidden">
       {/* Background Effects */}
@@ -294,24 +255,45 @@ function ViewMyWorkout() {
           </p>
         </div>
 
-        {/* Timeline View */}
-        <div className="max-w-4xl mx-auto">
-          <div className="relative">
-            {/* Timeline Line */}
-            <div className="absolute left-8 top-0 bottom-0 w-px">
-              {sortedWorkoutPlans.map((plan, index) => (
-                <div
-                  key={plan.id}
-                  className={`absolute w-full ${getTimelineLineStyle(
-                    plan
-                  )} transition-all duration-300`}
-                  style={{
-                    top: `${(index / sortedWorkoutPlans.length) * 100}%`,
-                    height: `${(1 / sortedWorkoutPlans.length) * 100}%`,
-                  }}
-                ></div>
-              ))}
+        {/* No Workout Plans Message */}
+        {workoutPlans.length === 0 ? (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-12 border border-gray-700/50 text-center">
+              <FiActivity className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-2">
+                No Workout Plans Yet
+              </h3>
+              <p className="text-gray-400 mb-6">
+                Your instructor hasn't assigned any workout plans to you yet. Check back later!
+              </p>
+              <Link
+                to="/profile"
+                className="inline-flex items-center px-6 py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-lg transition-colors"
+              >
+                <FiArrowLeft className="mr-2" />
+                Back to Profile
+              </Link>
             </div>
+          </div>
+        ) : (
+          /* Timeline View */
+          <div className="max-w-4xl mx-auto">
+            <div className="relative">
+              {/* Timeline Line */}
+              <div className="absolute left-8 top-0 bottom-0 w-px">
+                {sortedWorkoutPlans.map((plan, index) => (
+                  <div
+                    key={plan.id}
+                    className={`absolute w-full ${getTimelineLineStyle(
+                      plan
+                    )} transition-all duration-300`}
+                    style={{
+                      top: `${(index / sortedWorkoutPlans.length) * 100}%`,
+                      height: `${(1 / sortedWorkoutPlans.length) * 100}%`,
+                    }}
+                  ></div>
+                ))}
+              </div>
 
             <div className="space-y-8">
               {sortedWorkoutPlans.map((plan, index) => (
@@ -490,7 +472,8 @@ function ViewMyWorkout() {
               ))}
             </div>
           </div>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
