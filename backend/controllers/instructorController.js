@@ -890,6 +890,35 @@ export const createWorkoutPlan = async (req, res) => {
       .populate('student', 'firstName lastName email')
       .populate('instructor', 'firstName lastName');
 
+    // Send notification to the member about the assigned workout plan
+    try {
+      const instructor = await User.findById(instructorId);
+      if (member.user) {
+        await NotificationService.createNotification({
+          recipient: member.user,
+          sender: instructorId,
+          type: 'workout_plan_assigned',
+          title: 'New Workout Plan Assigned! 💪',
+          message: `${instructor.firstName} ${instructor.lastName} has assigned you a new workout plan: "${planName}"`,
+          data: {
+            workoutPlanId: workoutPlan._id,
+            planName: planName,
+            instructorId: instructorId,
+            instructorName: `${instructor.firstName} ${instructor.lastName}`,
+            startDate: startDate,
+            endDate: endDate,
+            type: type
+          },
+          link: '/customer/my-workout',
+          priority: 'high'
+        });
+        console.log('Workout plan assignment notification sent to member');
+      }
+    } catch (notificationError) {
+      console.error('Error creating workout plan notification:', notificationError);
+      // Don't fail the workout plan creation if notification fails
+    }
+
     res.status(201).json({
       success: true,
       message: 'Workout plan created successfully',
@@ -901,6 +930,122 @@ export const createWorkoutPlan = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to create workout plan',
+      error: error.message
+    });
+  }
+};
+
+// Get instructor's assigned workout plans with member progress
+export const getInstructorWorkoutPlans = async (req, res) => {
+  try {
+    const instructorId = req.user.id;
+    console.log('Fetching workout plans for instructor:', instructorId);
+
+    // Find all workout plans assigned by this instructor
+    const workoutPlans = await MemberWorkoutPlan.find({ instructor: instructorId })
+      .populate('student', 'firstName lastName email phoneNumber')
+      .populate('instructor', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+
+    console.log('Found workout plans:', workoutPlans.length);
+    console.log('Sample workout plan:', workoutPlans[0] ? {
+      id: workoutPlans[0]._id,
+      student: workoutPlans[0].student,
+      planName: workoutPlans[0].planName
+    } : 'No plans found');
+
+    // If no workout plans found, return empty array
+    if (!workoutPlans || workoutPlans.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: []
+      });
+    }
+
+    // Group workout plans by member and calculate progress
+    const memberPlans = {};
+    
+    try {
+      workoutPlans.forEach((plan, index) => {
+        try {
+          // Skip plans with null or missing student references
+          if (!plan.student || !plan.student._id) {
+            console.warn(`Skipping workout plan ${index} with missing student reference:`, plan._id);
+            return;
+          }
+          
+          const memberId = plan.student._id.toString();
+          
+          if (!memberPlans[memberId]) {
+            memberPlans[memberId] = {
+              member: plan.student,
+              plans: [],
+              totalProgress: 0,
+              activePlans: 0
+            };
+          }
+
+          // Calculate progress for this plan
+          let totalExercises = 0;
+          let completedExercises = 0;
+          
+          if (plan.schedule && Array.isArray(plan.schedule)) {
+            plan.schedule.forEach(day => {
+              if (day.exercises && Array.isArray(day.exercises)) {
+                day.exercises.forEach(exercise => {
+                  totalExercises++;
+                  if (exercise.workoutStatus === 1) {
+                    completedExercises++;
+                  }
+                });
+              }
+            });
+          }
+
+          const progress = totalExercises > 0 ? Math.round((completedExercises / totalExercises) * 100) : 0;
+          
+          memberPlans[memberId].plans.push({
+            ...plan.toObject(),
+            progress,
+            completedExercises,
+            totalExercises
+          });
+
+          memberPlans[memberId].totalProgress += progress;
+          memberPlans[memberId].activePlans++;
+        } catch (planError) {
+          console.error(`Error processing workout plan ${index}:`, planError);
+          console.error('Plan data:', plan);
+        }
+      });
+    } catch (forEachError) {
+      console.error('Error in forEach loop:', forEachError);
+      throw forEachError;
+    }
+
+    // Convert to array and calculate average progress
+    const membersWithPlans = Object.values(memberPlans).map(member => ({
+      ...member,
+      averageProgress: Math.round(member.totalProgress / member.activePlans)
+    }));
+
+    console.log('Processed members with plans:', membersWithPlans.length);
+    console.log('Sample member data:', membersWithPlans[0] ? {
+      memberName: `${membersWithPlans[0].member.firstName} ${membersWithPlans[0].member.lastName}`,
+      plansCount: membersWithPlans[0].plans.length,
+      averageProgress: membersWithPlans[0].averageProgress
+    } : 'No members found');
+
+    res.status(200).json({
+      success: true,
+      data: membersWithPlans
+    });
+
+  } catch (error) {
+    console.error('Error fetching instructor workout plans:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch workout plans',
       error: error.message
     });
   }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FiPlus,
   FiSearch,
@@ -12,140 +12,113 @@ import {
   FiMoreVertical,
   FiCheck,
   FiX,
+  FiLoader,
 } from "react-icons/fi";
 import { Link } from "react-router-dom";
+import api from "../../utils/api";
 
 function WorkoutPlans() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample data
-  const students = [
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john@example.com",
-      activePlan: "Strength Building Program",
-      progress: 65,
-      lastActive: "2024-03-05",
-      status: "active",
-      workoutPlans: [
-        {
-          id: 1,
-          name: "Strength Building Program",
-          startDate: "2024-03-01",
-          endDate: "2024-04-01",
-          type: "Strength",
-          status: "active",
-          progress: 65,
-          schedule: [
-            {
-              day: "Monday",
-              exercises: [
-                {
-                  name: "Bench Press",
-                  sets: 4,
-                  reps: "8-10",
-                  weight: "135 lbs",
-                },
-                {
-                  name: "Squats",
-                  sets: 4,
-                  reps: "8-10",
-                  weight: "185 lbs",
-                },
-              ],
-            },
-            {
-              day: "Wednesday",
-              exercises: [
-                {
-                  name: "Pull-ups",
-                  sets: 3,
-                  reps: "8-10",
-                  weight: "Bodyweight",
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Sarah Smith",
-      email: "sarah@example.com",
-      activePlan: "Weight Loss Program",
-      progress: 45,
-      lastActive: "2024-03-06",
-      status: "active",
-      workoutPlans: [
-        {
-          id: 2,
-          name: "Weight Loss Program",
-          startDate: "2024-03-05",
-          endDate: "2024-04-05",
-          type: "Cardio",
-          status: "active",
-          progress: 45,
-          schedule: [
-            {
-              day: "Tuesday",
-              exercises: [
-                {
-                  name: "Treadmill",
-                  duration: "30 min",
-                  intensity: "High",
-                },
-              ],
-            },
-            {
-              day: "Thursday",
-              exercises: [
-                {
-                  name: "Circuit Training",
-                  sets: 3,
-                  duration: "45 min",
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ];
+  // Fetch instructor's workout plans
+  useEffect(() => {
+    const fetchWorkoutPlans = async () => {
+      try {
+        setLoading(true);
+        const response = await api.getInstructorWorkoutPlans();
+        
+        if (response.success) {
+          setStudents(response.data);
+        } else {
+          setError(response.message || 'Failed to load workout plans');
+        }
+      } catch (err) {
+        console.error('Error fetching workout plans:', err);
+        setError(err.message || 'Failed to load workout plans');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWorkoutPlans();
+  }, []);
+
+  // Calculate stats from real data
+  const totalStudents = students.length;
+  const totalPlans = students.reduce((sum, student) => sum + student.plans.length, 0);
+  const averageProgress = students.length > 0 
+    ? Math.round(students.reduce((sum, student) => sum + student.averageProgress, 0) / students.length)
+    : 0;
+  const completedPlans = students.reduce((sum, student) => 
+    sum + student.plans.filter(plan => plan.progress === 100).length, 0
+  );
+  const completionRate = totalPlans > 0 ? Math.round((completedPlans / totalPlans) * 100) : 0;
 
   const stats = [
     {
       title: "Total Students",
-      value: "24",
-      change: "+12.5%",
+      value: totalStudents.toString(),
+      change: "+0%",
       trend: "up",
       description: "Active students",
     },
     {
       title: "Active Plans",
-      value: "18",
-      change: "+23.4%",
+      value: totalPlans.toString(),
+      change: "+0%",
       trend: "up",
       description: "Current plans",
     },
     {
       title: "Completion Rate",
-      value: "92%",
-      change: "+5.2%",
+      value: `${completionRate}%`,
+      change: "+0%",
       trend: "up",
       description: "Average completion",
     },
     {
       title: "Student Progress",
-      value: "78%",
-      change: "+18.7%",
+      value: `${averageProgress}%`,
+      change: "+0%",
       trend: "up",
       description: "Average progress",
     },
   ];
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-violet-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading workout plans...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-xl mb-4">⚠️ Error</div>
+          <p className="text-gray-400">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -231,86 +204,103 @@ function WorkoutPlans() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {students.map((student) => (
-                <tr
-                  key={student.id}
-                  className="hover:bg-gray-700/20 transition-colors"
-                >
-                  <td className="p-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 rounded-full bg-violet-500/10 flex items-center justify-center">
-                        <FiUser className="h-5 w-5 text-violet-400" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-white">
-                          {student.name}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          {student.email}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4 text-gray-300">{student.activePlan}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-violet-500 rounded-full"
-                          style={{ width: `${student.progress}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-gray-400">{student.progress}%</span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-gray-300">{student.lastActive}</td>
-                  <td className="p-4">
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-                        student.status === "active"
-                          ? "bg-green-500/10 text-green-400"
-                          : "bg-gray-500/10 text-gray-400"
-                      }`}
-                    >
-                      {student.status === "active" ? (
-                        <FiCheck className="w-4 h-4 mr-1" />
-                      ) : (
-                        <FiX className="w-4 h-4 mr-1" />
-                      )}
-                      {student.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => setSelectedStudent(student)}
-                        className="p-2 text-gray-400 hover:text-white transition-colors"
-                        title="View Plans"
-                      >
-                        <FiActivity className="w-5 h-5" />
-                      </button>
-                      <button
-                        className="p-2 text-gray-400 hover:text-white transition-colors"
-                        title="Edit"
-                      >
-                        <FiEdit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                        title="Delete"
-                      >
-                        <FiTrash2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        className="p-2 text-gray-400 hover:text-white transition-colors"
-                        title="More"
-                      >
-                        <FiMoreVertical className="w-5 h-5" />
-                      </button>
-                    </div>
+              {students.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-gray-400">
+                    <FiActivity className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+                    <p className="text-lg font-medium mb-2">No Workout Plans Yet</p>
+                    <p>You haven't assigned any workout plans to students yet.</p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                students.map((student) => (
+                  <tr
+                    key={student.member._id}
+                    className="hover:bg-gray-700/20 transition-colors"
+                  >
+                    <td className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 rounded-full bg-violet-500/10 flex items-center justify-center">
+                          <FiUser className="h-5 w-5 text-violet-400" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-white">
+                            {student.member.firstName} {student.member.lastName}
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {student.member.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4 text-gray-300">
+                      {student.plans.length > 0 ? student.plans[0].planName : 'No active plan'}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-violet-500 rounded-full"
+                            style={{ width: `${student.averageProgress}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-gray-400">{student.averageProgress}%</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-gray-300">
+                      {student.plans.length > 0 
+                        ? new Date(student.plans[0].updatedAt).toLocaleDateString()
+                        : 'Never'
+                      }
+                    </td>
+                    <td className="p-4">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
+                          student.averageProgress > 0
+                            ? "bg-green-500/10 text-green-400"
+                            : "bg-gray-500/10 text-gray-400"
+                        }`}
+                      >
+                        {student.averageProgress > 0 ? (
+                          <FiCheck className="w-4 h-4 mr-1" />
+                        ) : (
+                          <FiX className="w-4 h-4 mr-1" />
+                        )}
+                        {student.averageProgress > 0 ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => setSelectedStudent(student)}
+                          className="p-2 text-gray-400 hover:text-white transition-colors"
+                          title="View Plans"
+                        >
+                          <FiActivity className="w-5 h-5" />
+                        </button>
+                        <button
+                          className="p-2 text-gray-400 hover:text-white transition-colors"
+                          title="Edit"
+                        >
+                          <FiEdit2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                          title="Delete"
+                        >
+                          <FiTrash2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          className="p-2 text-gray-400 hover:text-white transition-colors"
+                          title="More"
+                        >
+                          <FiMoreVertical className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -332,9 +322,9 @@ function WorkoutPlans() {
               <div className="bg-gray-800 px-6 py-4 border-b border-gray-700 flex items-center justify-between">
                 <div>
                   <h3 className="text-2xl font-bold text-white">
-                    {selectedStudent.name}'s Workout Plans
+                    {selectedStudent.member.firstName} {selectedStudent.member.lastName}'s Workout Plans
                   </h3>
-                  <p className="text-gray-400 mt-1">{selectedStudent.email}</p>
+                  <p className="text-gray-400 mt-1">{selectedStudent.member.email}</p>
                 </div>
                 <button
                   onClick={() => setSelectedStudent(null)}
@@ -346,20 +336,20 @@ function WorkoutPlans() {
 
               {/* Modal Content */}
               <div className="bg-gray-800 px-6 py-4">
-                {selectedStudent.workoutPlans.map((plan) => (
+                {selectedStudent.plans.map((plan) => (
                   <div
-                    key={plan.id}
+                    key={plan._id}
                     className="bg-gray-900/50 rounded-xl p-6 mb-6 border border-gray-700/50"
                   >
                     <div className="flex items-center justify-between mb-6">
                       <div>
                         <h4 className="text-xl font-semibold text-white mb-2">
-                          {plan.name}
+                          {plan.planName}
                         </h4>
                         <div className="flex items-center gap-4 text-gray-400">
                           <div className="flex items-center gap-2">
                             <FiCalendar className="w-4 h-4 text-violet-400" />
-                            {plan.startDate} - {plan.endDate}
+                            {new Date(plan.startDate).toLocaleDateString()} - {new Date(plan.endDate).toLocaleDateString()}
                           </div>
                           <div className="flex items-center gap-2">
                             <FiActivity className="w-4 h-4 text-violet-400" />
@@ -383,6 +373,9 @@ function WorkoutPlans() {
                               {plan.progress}%
                             </span>
                           </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {plan.completedExercises}/{plan.totalExercises} exercises
+                          </div>
                         </div>
                         <button className="p-2 text-gray-400 hover:text-white transition-colors">
                           <FiMoreVertical className="w-5 h-5" />
@@ -395,18 +388,27 @@ function WorkoutPlans() {
                       {plan.schedule.map((day, dayIndex) => (
                         <div key={dayIndex}>
                           <h5 className="text-lg font-medium text-white mb-4">
-                            {day.day}
+                            {day.days ? day.days.join(', ') : 'Unscheduled'}
                           </h5>
                           <div className="space-y-4">
                             {day.exercises.map((exercise, exerciseIndex) => (
                               <div
                                 key={exerciseIndex}
-                                className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg"
+                                className={`flex items-center justify-between p-4 rounded-lg ${
+                                  exercise.workoutStatus === 1 
+                                    ? 'bg-green-500/10 border border-green-500/30' 
+                                    : 'bg-gray-800/50'
+                                }`}
                               >
-                                <div>
-                                  <h6 className="text-white font-medium mb-1">
-                                    {exercise.name}
-                                  </h6>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h6 className="text-white font-medium">
+                                      {exercise.name}
+                                    </h6>
+                                    {exercise.workoutStatus === 1 && (
+                                      <FiCheck className="w-4 h-4 text-green-400" />
+                                    )}
+                                  </div>
                                   <div className="text-sm text-gray-400">
                                     {exercise.sets && `${exercise.sets} sets`}
                                     {exercise.reps &&
@@ -414,17 +416,17 @@ function WorkoutPlans() {
                                     {exercise.weight && ` @ ${exercise.weight}`}
                                     {exercise.duration &&
                                       ` for ${exercise.duration}`}
-                                    {exercise.intensity &&
-                                      ` (${exercise.intensity} intensity)`}
+                                    {exercise.notes && ` - ${exercise.notes}`}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <button className="p-2 text-gray-400 hover:text-white transition-colors">
-                                    <FiEdit2 className="w-5 h-5" />
-                                  </button>
-                                  <button className="p-2 text-gray-400 hover:text-red-400 transition-colors">
-                                    <FiTrash2 className="w-5 h-5" />
-                                  </button>
+                                  <span className={`px-2 py-1 rounded-full text-xs ${
+                                    exercise.workoutStatus === 1
+                                      ? 'bg-green-500/20 text-green-400'
+                                      : 'bg-gray-500/20 text-gray-400'
+                                  }`}>
+                                    {exercise.workoutStatus === 1 ? 'Completed' : 'Pending'}
+                                  </span>
                                 </div>
                               </div>
                             ))}

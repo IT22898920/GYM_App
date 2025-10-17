@@ -63,6 +63,7 @@ const notificationSchema = new mongoose.Schema({
       
       // Workout related
       'workout_gif_uploaded',
+      'workout_plan_assigned',
       
       // Member related
       'member_joined_gym',

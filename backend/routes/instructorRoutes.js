@@ -14,7 +14,8 @@ import {
   getFreelanceInstructors,
   getAssignedMembers,
   createWorkoutPlan,
-  getInstructorGymExercises
+  getInstructorGymExercises,
+  getInstructorWorkoutPlans
 } from '../controllers/instructorController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { handleValidationErrors } from '../middleware/errorHandler.js';
@@ -41,6 +42,7 @@ router.post(
 router.get('/my-applications', getMyApplications);
 router.get('/assigned-members', authorize('instructor'), getAssignedMembers);
 router.get('/gym-exercises', authorize('instructor'), getInstructorGymExercises);
+router.get('/workout-plans', authorize('instructor'), getInstructorWorkoutPlans);
 router.post('/workout-plan', authorize('instructor'), createWorkoutPlan);
 
 // Admin only routes - specific paths

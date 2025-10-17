@@ -358,7 +358,25 @@ export default function AddMemberForm() {
         throw new Error(data.message || 'Failed to add member');
       }
 
-      showAlert('success', 'Member added successfully!');
+      // Show login credentials if a temporary password was generated
+      if (data.data.temporaryPassword) {
+        console.log('🔐 New Member Login Credentials:', {
+          email: formData.email,
+          password: data.data.temporaryPassword,
+          name: `${formData.firstName} ${formData.lastName}`
+        });
+        
+        showAlert('success', 
+          `Member added successfully! 🎉\n\n` +
+          `Login Credentials:\n` +
+          `Email: ${formData.email}\n` +
+          `Password: ${data.data.temporaryPassword}\n\n` +
+          `Please share these credentials with the member. They can login as a customer.`
+        );
+      } else {
+        showAlert('success', 'Member added successfully!');
+      }
+      
       navigate('/gym-owner/members');
     } catch (error) {
       console.error('Error adding member:', error);

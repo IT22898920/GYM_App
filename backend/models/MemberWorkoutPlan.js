@@ -62,6 +62,11 @@ const workoutPlanSchema = new mongoose.Schema({
       },
       notes: {
         type: String
+      },
+      workoutStatus: {
+        type: Number,
+        default: 0,
+        enum: [0, 1] // 0 = not completed, 1 = completed
       }
     }],
     meals: [{

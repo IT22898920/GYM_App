@@ -355,16 +355,22 @@ export const addMember = async (req, res) => {
 
     // Check if a user account exists with this email
     let user = await User.findOne({ email: memberData.email });
+    let temporaryPassword = null;
     
     // If no user exists, create one
     if (!user) {
-      const hashedPassword = await bcrypt.hash(memberData.password, 10);
+      // Generate a secure temporary password if not provided
+      if (!memberData.password || memberData.password.length < 6) {
+        temporaryPassword = Math.random().toString(36).slice(-8) + 'Gym@2024';
+      } else {
+        temporaryPassword = memberData.password;
+      }
       
       user = new User({
         firstName: memberData.firstName,
         lastName: memberData.lastName,
         email: memberData.email,
-        password: hashedPassword,
+        password: temporaryPassword, // User model will hash it automatically
         phoneNumber: memberData.phoneNumber,
         role: 'customer',
         gender: memberData.gender,
@@ -410,23 +416,41 @@ export const addMember = async (req, res) => {
 
     await member.save();
 
-    // Send notification to the new member
-    await NotificationService.createNotification({
-      recipient: user._id,
-      sender: gymOwnerId,
-      type: 'member_joined_gym',
-      title: 'Welcome to ' + gym.name,
-      message: `You have been registered as a member at ${gym.name}. Your ${memberData.membershipPlan} membership is now active.`,
-      data: {
-        gymId: gym._id,
-        memberId: member._id
-      }
-    });
+    // Send notification to the new member with login credentials
+    if (temporaryPassword) {
+      await NotificationService.createNotification({
+        recipient: user._id,
+        sender: gymOwnerId,
+        type: 'member_joined_gym',
+        title: 'Welcome to ' + gym.gymName,
+        message: `You have been registered as a member at ${gym.gymName}. Your ${memberData.membershipPlan} membership is now active. Your login credentials are: Email: ${user.email}, Password: ${temporaryPassword}. Please change your password after first login.`,
+        data: {
+          gymId: gym._id,
+          memberId: member._id,
+          temporaryPassword: temporaryPassword
+        }
+      });
+    } else {
+      await NotificationService.createNotification({
+        recipient: user._id,
+        sender: gymOwnerId,
+        type: 'member_joined_gym',
+        title: 'Welcome to ' + gym.gymName,
+        message: `You have been registered as a member at ${gym.gymName}. Your ${memberData.membershipPlan} membership is now active.`,
+        data: {
+          gymId: gym._id,
+          memberId: member._id
+        }
+      });
+    }
 
     res.status(201).json({
       success: true,
       message: 'Member added successfully',
-      data: member
+      data: {
+        member,
+        temporaryPassword: temporaryPassword || null
+      }
     });
 
   } catch (error) {
@@ -1224,6 +1248,130 @@ export const getMyWorkoutPlans = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch workout plans',
+      error: error.message
+    });
+  }
+};
+
+// Update workout exercise status
+export const updateWorkoutStatus = async (req, res) => {
+  try {
+    const { workoutPlanId, dayIndex, exerciseIndex, workoutStatus } = req.body;
+    const userId = req.user.id;
+
+    console.log('🔄 Update workout status request:', {
+      workoutPlanId,
+      dayIndex,
+      exerciseIndex,
+      workoutStatus,
+      userId,
+      userIdType: typeof userId
+    });
+
+    // Find the member record for this user
+    const member = await Member.findOne({ user: userId });
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member profile not found'
+      });
+    }
+
+    console.log('🔍 Found member:', {
+      memberId: member._id,
+      userId: userId
+    });
+
+    // Import MemberWorkoutPlan model
+    const MemberWorkoutPlan = (await import('../models/MemberWorkoutPlan.js')).default;
+
+    // Find the workout plan and verify it belongs to this member
+    const workoutPlan = await MemberWorkoutPlan.findOne({
+      _id: workoutPlanId,
+      student: member._id
+    });
+
+    console.log('🔍 Found workout plan:', workoutPlan ? 'Yes' : 'No');
+    if (workoutPlan) {
+      console.log('🔍 Workout plan schedule length:', workoutPlan.schedule.length);
+      console.log('🔍 Day at index', dayIndex, ':', workoutPlan.schedule[dayIndex]);
+      if (workoutPlan.schedule[dayIndex]) {
+        console.log('🔍 Exercises in day:', workoutPlan.schedule[dayIndex].exercises.length);
+        console.log('🔍 Exercise at index', exerciseIndex, ':', workoutPlan.schedule[dayIndex].exercises[exerciseIndex]);
+      }
+    } else {
+      // Debug: Check if workout plan exists but with different student
+      const allPlans = await MemberWorkoutPlan.find({ _id: workoutPlanId });
+      console.log('🔍 All plans with this ID:', allPlans.length);
+      if (allPlans.length > 0) {
+        console.log('🔍 Plan exists but student mismatch:', {
+          planStudent: allPlans[0].student,
+          requestMemberId: member._id,
+          match: allPlans[0].student.toString() === member._id.toString()
+        });
+      }
+    }
+
+    if (!workoutPlan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workout plan not found or not assigned to you'
+      });
+    }
+
+    // Validate indices
+    if (!workoutPlan.schedule[dayIndex] || !workoutPlan.schedule[dayIndex].exercises[exerciseIndex]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid exercise index'
+      });
+    }
+
+    // Check if exercise is already completed and trying to mark as incomplete
+    const currentExercise = workoutPlan.schedule[dayIndex].exercises[exerciseIndex];
+    if (currentExercise.workoutStatus === 1 && workoutStatus === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Exercise is already completed and cannot be changed'
+      });
+    }
+
+    // Update the workout status
+    workoutPlan.schedule[dayIndex].exercises[exerciseIndex].workoutStatus = workoutStatus;
+    await workoutPlan.save();
+
+    // Calculate progress
+    let totalExercises = 0;
+    let completedExercises = 0;
+    
+    workoutPlan.schedule.forEach(day => {
+      day.exercises.forEach(exercise => {
+        totalExercises++;
+        if (exercise.workoutStatus === 1) {
+          completedExercises++;
+        }
+      });
+    });
+
+    const progress = totalExercises > 0 ? Math.round((completedExercises / totalExercises) * 100) : 0;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Workout status updated successfully',
+      data: {
+        workoutStatus,
+        progress,
+        completedExercises,
+        totalExercises
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating workout status:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update workout status',
       error: error.message
     });
   }
