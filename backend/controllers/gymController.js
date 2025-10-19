@@ -5,6 +5,9 @@ import { sendGymApprovalEmail, sendGymRejectionEmail, sendGymPendingEmail } from
 import { deleteFromCloudinary } from '../config/cloudinary.js';
 import NotificationService from '../services/notificationService.js';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
+import Gif from '../models/Gif.js';
+import CollaborationRequest from '../models/CollaborationRequest.js';
 
 // Upload gym logo
 export const uploadGymLogo = async (req, res) => {
@@ -133,13 +136,9 @@ export const uploadGymImages = async (req, res) => {
 // Create a new gym
 export const createGym = async (req, res) => {
   try {
-    console.log('DEBUG - Full request body:', JSON.stringify(req.body, null, 2));
-    console.log('DEBUG - Coordinates in body:', req.body.coordinates);
-    console.log('DEBUG - Coordinates type:', typeof req.body.coordinates);
-    console.log('DEBUG - Is array?', Array.isArray(req.body.coordinates));
-    
     const {
       gymName,
+      gymType,
       description,
       contactInfo,
       address,
@@ -149,7 +148,14 @@ export const createGym = async (req, res) => {
       operatingHours,
       capacity,
       establishedYear,
-      tags
+      tags,
+      selectedWorkouts,
+      paymentMethods,
+      paymentProcessor,
+      promotions,
+      socialMedia,
+      registrationFee,
+      pricing
     } = req.body;
 
     // Ensure user is a gym owner or admin
@@ -157,6 +163,14 @@ export const createGym = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Only gym owners can create gyms'
+      });
+    }
+
+    // Basic validation
+    if (!gymName || !gymType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gym name and type are required'
       });
     }
 
@@ -169,9 +183,28 @@ export const createGym = async (req, res) => {
       });
     }
 
+    // Convert selectedWorkouts string IDs to ObjectIds
+    const workoutObjectIds = selectedWorkouts && selectedWorkouts.length > 0 
+      ? selectedWorkouts.filter(id => id && id.trim() !== '').map(id => {
+          try {
+            return new mongoose.Types.ObjectId(id);
+          } catch (error) {
+            console.warn('Invalid workout ID:', id, error.message);
+            return null;
+          }
+        }).filter(id => id !== null)
+      : [];
+
+
+    // Normalize optional/enumerated fields
+    const normalizedPaymentProcessor = paymentProcessor && typeof paymentProcessor === 'string' && paymentProcessor.trim()
+      ? paymentProcessor
+      : undefined;
+
     // Create new gym
     const newGym = new Gym({
       gymName,
+      gymType,
       description,
       owner: req.user.id,
       contactInfo,
@@ -186,6 +219,22 @@ export const createGym = async (req, res) => {
       capacity,
       establishedYear,
       tags,
+      selectedWorkouts: workoutObjectIds,
+      paymentMethods: Array.isArray(paymentMethods) ? paymentMethods : [],
+      paymentProcessor: normalizedPaymentProcessor,
+      promotions,
+      socialMedia: socialMedia || {},
+      pricing: pricing || {
+        membershipPlans: [],
+        dropInFee: 0
+      },
+      registrationFee: {
+        amount: registrationFee?.amount || 20,
+        currency: registrationFee?.currency || 'USD',
+        paid: registrationFee?.paid || false,
+        paymentMethod: registrationFee?.paymentMethod,
+        paidAt: registrationFee?.paid ? new Date() : undefined
+      },
       status: 'pending',
       verificationStatus: 'pending',
       isActive: false // Will be activated after approval
@@ -389,6 +438,16 @@ export const updateGym = async (req, res) => {
       delete updateData.coordinates;
     }
 
+    // Sanitize enum fields that may be sent as empty strings
+    if (Object.prototype.hasOwnProperty.call(updateData, 'paymentProcessor')) {
+      if (!updateData.paymentProcessor || (typeof updateData.paymentProcessor === 'string' && !updateData.paymentProcessor.trim())) {
+        delete updateData.paymentProcessor; // avoid enum validation error for ''
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(updateData, 'paymentMethods') && !Array.isArray(updateData.paymentMethods)) {
+      delete updateData.paymentMethods;
+    }
+
     const updatedGym = await Gym.findByIdAndUpdate(
       id,
       { ...updateData, updatedAt: Date.now() },
@@ -494,6 +553,7 @@ export const approveGym = async (req, res) => {
       {
         status: 'approved',
         verificationStatus: 'verified',
+        isActive: true,
         adminNotes: adminNotes || '',
         updatedAt: Date.now()
       },
@@ -852,6 +912,102 @@ export const removeInstructorFromGym = async (req, res) => {
   }
 };
 
+// Search available instructors for a gym (exclude already added)
+export const searchAvailableInstructors = async (req, res) => {
+  try {
+    const { gymId } = req.params;
+    const { search, specialization } = req.query;
+
+    // Validate gym exists and requester is owner/admin
+    const gym = await Gym.findById(gymId).select('owner instructors');
+    if (!gym) {
+      return res.status(404).json({ success: false, message: 'Gym not found' });
+    }
+
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    // Build base filter: active instructors
+    const userFilter = { role: 'instructor', isActive: true };
+
+    if (specialization && specialization !== 'all') {
+      userFilter.$or = [
+        { specialization: { $regex: specialization, $options: 'i' } },
+        { 'application.specialization': { $regex: specialization, $options: 'i' } }
+      ];
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      userFilter.$or = [
+        ...(userFilter.$or || []),
+        { firstName: { $regex: searchRegex } },
+        { lastName: { $regex: searchRegex } },
+        { email: { $regex: searchRegex } }
+      ];
+    }
+
+    // Exclude instructors already in this gym
+    const existingInstructorIds = (gym.instructors || []).map(inst => inst.instructor?.toString());
+
+    // Fetch instructors from approved freelance applications to prioritize candidates
+    const freelanceApplications = await InstructorApplication.find({
+      status: 'approved',
+      isFreelance: true
+    })
+      .populate('applicant', '-password -refreshToken')
+      .select('specialization experience preferredLocation availability profilePicture certifications resume isFreelance motivation applicant');
+
+    // Map to unified list and apply filters
+    let candidates = freelanceApplications
+      .map(app => ({
+        _id: app.applicant?._id,
+        firstName: app.applicant?.firstName,
+        lastName: app.applicant?.lastName,
+        email: app.applicant?.email,
+        phone: app.applicant?.phone,
+        specialization: app.specialization,
+        experience: app.experience,
+        applicationDetails: {
+          specialization: app.specialization,
+          experience: app.experience,
+          preferredLocation: app.preferredLocation,
+          availability: app.availability,
+          profilePicture: app.profilePicture,
+          certifications: app.certifications,
+          resume: app.resume,
+          isFreelance: app.isFreelance,
+          motivation: app.motivation
+        }
+      }))
+      .filter(c => c._id);
+
+    if (specialization && specialization !== 'all') {
+      const specRegex = new RegExp(specialization, 'i');
+      candidates = candidates.filter(c => specRegex.test(c.specialization || ''));
+    }
+
+    if (search && search.trim()) {
+      const r = new RegExp(search.trim(), 'i');
+      candidates = candidates.filter(c => r.test(c.firstName || '') || r.test(c.lastName || '') || r.test(c.email || ''));
+    }
+
+    // Remove already added to this gym
+    candidates = candidates.filter(c => !existingInstructorIds.includes(c._id.toString()));
+
+    // Exclude instructors with already accepted collaboration with this gym
+    const acceptedCollabs = await CollaborationRequest.find({ gym: gymId, status: 'accepted' }).select('toInstructor');
+    const acceptedIds = new Set(acceptedCollabs.map(cr => cr.toInstructor.toString()));
+    candidates = candidates.filter(c => !acceptedIds.has(c._id.toString()));
+
+    return res.status(200).json({ success: true, data: candidates });
+  } catch (error) {
+    console.error('Error searching available instructors:', error);
+    return res.status(500).json({ success: false, message: 'Failed to search instructors', error: error.message });
+  }
+};
+
 // Update instructor in gym
 export const updateInstructorInGym = async (req, res) => {
   try {
@@ -1017,16 +1173,13 @@ export const registerInstructorForGym = async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
     // Create new instructor user
     const newInstructor = new User({
       email,
       firstName,
       lastName,
       phone,
-      password: hashedPassword,
+      password,
       role: 'instructor',
       specialization,
       experience,
@@ -1512,5 +1665,108 @@ export const deleteGymImage = async (req, res) => {
       message: 'Failed to delete gym image',
       error: error.message
     });
+  }
+};
+
+// Get workouts (selectedWorkouts) for a gym
+export const getGymWorkouts = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch minimal fields first to perform robust authorization without populate
+    const gymBasic = await Gym.findById(id).select('owner status');
+    if (!gymBasic) {
+      return res.status(404).json({ success: false, message: 'Gym not found' });
+    }
+
+    // Only owners or admins can view unapproved gyms
+    if (gymBasic.status !== 'approved') {
+      const ownerId = gymBasic.owner?.toString();
+      if (!req.user || ((ownerId !== req.user.id) && req.user.role !== 'admin')) {
+        return res.status(403).json({ success: false, message: 'Not authorized to view workouts for this gym' });
+      }
+    }
+
+    // Now fetch populated workouts for response
+    const gym = await Gym.findById(id).select('selectedWorkouts').populate('selectedWorkouts');
+    return res.status(200).json({ success: true, data: gym?.selectedWorkouts || [] });
+  } catch (error) {
+    console.error('Error fetching gym workouts:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch gym workouts', error: error.message });
+  }
+};
+
+// Add workouts to a gym from admin-created workouts (GIFs)
+export const addGymWorkouts = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { workoutIds } = req.body;
+
+    if (!Array.isArray(workoutIds) || workoutIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'workoutIds must be a non-empty array' });
+    }
+
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({ success: false, message: 'Gym not found' });
+    }
+
+    // Owner or admin only
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to modify workouts for this gym' });
+    }
+
+    // Validate workout IDs exist in Gif collection (admin-managed)
+    const validWorkouts = await Gif.find({ _id: { $in: workoutIds } }).select('_id');
+    const validIds = validWorkouts.map(w => w._id.toString());
+    if (validIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid workouts found for provided IDs' });
+    }
+
+    const currentIds = (gym.selectedWorkouts || []).map(id => id.toString());
+    const toAdd = validIds.filter(id => !currentIds.includes(id));
+
+    if (toAdd.length === 0) {
+      return res.status(200).json({ success: true, message: 'No new workouts to add', data: gym.selectedWorkouts });
+    }
+
+    gym.selectedWorkouts = [...(gym.selectedWorkouts || []), ...toAdd];
+    await gym.save();
+
+    const populated = await Gym.findById(id).populate('selectedWorkouts');
+    return res.status(200).json({ success: true, message: 'Workouts added successfully', data: populated.selectedWorkouts });
+  } catch (error) {
+    console.error('Error adding gym workouts:', error);
+    return res.status(500).json({ success: false, message: 'Failed to add gym workouts', error: error.message });
+  }
+};
+
+// Remove a workout from a gym
+export const removeGymWorkout = async (req, res) => {
+  try {
+    const { id, workoutId } = req.params;
+
+    const gym = await Gym.findById(id);
+    if (!gym) {
+      return res.status(404).json({ success: false, message: 'Gym not found' });
+    }
+
+    if (gym.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to modify workouts for this gym' });
+    }
+
+    const before = gym.selectedWorkouts?.length || 0;
+    gym.selectedWorkouts = (gym.selectedWorkouts || []).filter(w => w.toString() !== workoutId);
+    const after = gym.selectedWorkouts.length;
+    if (before === after) {
+      return res.status(404).json({ success: false, message: 'Workout not found in this gym' });
+    }
+
+    await gym.save();
+    const populated = await Gym.findById(id).populate('selectedWorkouts');
+    return res.status(200).json({ success: true, message: 'Workout removed successfully', data: populated.selectedWorkouts });
+  } catch (error) {
+    console.error('Error removing gym workout:', error);
+    return res.status(500).json({ success: false, message: 'Failed to remove gym workout', error: error.message });
   }
 };

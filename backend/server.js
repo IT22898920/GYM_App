@@ -15,6 +15,7 @@ import chatRoutes from './routes/chatRoutes.js';
 import callRoutes from './routes/callRoutes.js';
 import memberRoutes from './routes/memberRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import gifRoutes from './routes/gifRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -68,6 +69,7 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/gifs', gifRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -175,11 +177,29 @@ const io = new Server(server, {
   }
 });
 
+// Make io available to controllers via app.locals
+app.locals.io = io;
+
 // WebRTC signaling namespace
 const webrtcNamespace = io.of('/webrtc');
 
+// General notifications namespace
+const notificationNamespace = io.of('/notifications');
+
 // Store active call sessions
 const activeCalls = new Map();
+
+// Handle general notification connections
+notificationNamespace.on('connection', (socket) => {
+  console.log(`Notification client connected: ${socket.id}`);
+  
+  // Join the general room for broadcast notifications
+  socket.join('general');
+  
+  socket.on('disconnect', () => {
+    console.log(`Notification client disconnected: ${socket.id}`);
+  });
+});
 
 webrtcNamespace.on('connection', (socket) => {
   console.log(`WebRTC client connected: ${socket.id}`);

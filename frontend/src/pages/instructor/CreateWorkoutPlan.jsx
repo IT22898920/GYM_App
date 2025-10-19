@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   FiArrowLeft,
@@ -59,11 +59,70 @@ function CreateWorkoutPlan() {
     ],
   });
 
-  // Sample data
-  const students = [
-    { id: 1, name: "John Doe", email: "john@example.com" },
-    { id: 2, name: "Sarah Smith", email: "sarah@example.com" },
-  ];
+  const [students, setStudents] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [gymExercises, setGymExercises] = useState([]);
+  const [loadingExercises, setLoadingExercises] = useState(false);
+
+  // Fetch assigned members and gym exercises on component mount
+  useEffect(() => {
+    fetchAssignedMembers();
+    fetchGymExercises();
+  }, []);
+
+  const fetchAssignedMembers = async () => {
+    try {
+      setLoadingStudents(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/instructors/assigned-members`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch assigned members');
+      }
+
+      const data = await response.json();
+      // Transform the data to match the expected format
+      const transformedStudents = data.data.map(member => ({
+        id: member._id,
+        name: `${member.firstName} ${member.lastName}`,
+        email: member.email,
+        memberData: member
+      }));
+      setStudents(transformedStudents);
+    } catch (error) {
+      console.error('Error fetching assigned members:', error);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const fetchGymExercises = async () => {
+    try {
+      setLoadingExercises(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/instructors/gym-exercises`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch gym exercises');
+      }
+
+      const data = await response.json();
+      setGymExercises(data.data.exercises || []);
+    } catch (error) {
+      console.error('Error fetching gym exercises:', error);
+      // Don't show error to user, just set empty array
+      setGymExercises([]);
+    } finally {
+      setLoadingExercises(false);
+    }
+  };
 
   const planTypes = [
     "Strength Training",
@@ -369,10 +428,60 @@ function CreateWorkoutPlan() {
   };
 
   // ----- Form submission -----
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     console.log("Form submitted:", formData);
-    // Add your submission logic here (API call, etc.)
+    
+    if (submitting) return; // Prevent multiple submissions
+    
+    try {
+      setSubmitting(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/instructors/workout-plan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to create workout plan');
+      }
+
+      console.log('Workout plan created successfully:', result);
+      alert('Workout plan created successfully!');
+      
+      // Optional: redirect or reset form
+      setFormData({
+        studentId: "",
+        planName: "",
+        startDate: "",
+        endDate: "",
+        type: "",
+        description: "",
+        schedule: [{
+          days: [],
+          exercises: [
+            { name: "", sets: "", reps: "", weight: "", duration: "", notes: "" }
+          ],
+          meals: [
+            { type: "Breakfast", time: "08:00", items: [], calories: "", protein: "", carbs: "", fats: "", notes: "" }
+          ],
+          supplements: [
+            { name: "", dosage: "", timing: "", notes: "" }
+          ]
+        }]
+      });
+
+    } catch (error) {
+      console.error('Error creating workout plan:', error);
+      alert('Error creating workout plan: ' + error.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -416,9 +525,12 @@ function CreateWorkoutPlan() {
                   name="studentId"
                   value={formData.studentId}
                   onChange={handleChange}
-                  className="w-full bg-gray-900/50 text-white rounded-lg pl-12 pr-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                  disabled={loadingStudents || students.length === 0}
+                  className="w-full bg-gray-900/50 text-white rounded-lg pl-12 pr-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select a student</option>
+                  <option value="">
+                    {loadingStudents ? "Loading assigned members..." : students.length === 0 ? "No assigned members found" : "Select a student"}
+                  </option>
                   {students.map((student) => (
                     <option key={student.id} value={student.id}>
                       {student.name}
@@ -580,7 +692,12 @@ function CreateWorkoutPlan() {
                 {/* Workouts Section */}
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-medium text-white">Workouts</h4>
+                    <div>
+                      <h4 className="text-lg font-medium text-white">Workouts</h4>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Exercises are loaded from your gym's available workouts
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => addExercise(blockIndex)}
@@ -599,8 +716,7 @@ function CreateWorkoutPlan() {
                       >
                         {/* Exercise Name */}
                         <div className="md:col-span-2">
-                          <input
-                            type="text"
+                          <select
                             value={exercise.name}
                             onChange={(e) =>
                               handleExerciseChange(
@@ -611,8 +727,19 @@ function CreateWorkoutPlan() {
                               )
                             }
                             className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-2 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-                            placeholder="Exercise name"
-                          />
+                            disabled={loadingExercises}
+                          >
+                            <option value="">
+                              {loadingExercises ? "Loading exercises..." : 
+                               gymExercises.length === 0 ? "No exercises available" : 
+                               "Select exercise"}
+                            </option>
+                            {gymExercises.map((exerciseOption) => (
+                              <option key={exerciseOption.id} value={exerciseOption.name}>
+                                {exerciseOption.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         {/* Sets */}
@@ -953,10 +1080,11 @@ function CreateWorkoutPlan() {
           </Link>
           <button
             type="submit"
-            className="flex items-center space-x-2 px-6 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+            disabled={submitting}
+            className="flex items-center space-x-2 px-6 py-3 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FiSave className="w-5 h-5" />
-            <span>Save Plan</span>
+            <span>{submitting ? 'Saving...' : 'Save Plan'}</span>
           </button>
         </div>
       </form>

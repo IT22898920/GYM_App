@@ -265,7 +265,8 @@ export const formatGymDataForAPI = (formData) => {
 
   const apiData = {
     gymName: formData.gymName,
-    description: formData.gymType || formData.description, // Using gymType as description if no description provided
+    gymType: formData.gymType,
+    description: formData.gymType || `A ${formData.gymType} providing quality fitness services`, // Using gymType as description if no description provided
     contactInfo: {
       email: formData.email,
       phone: formData.phone,
@@ -298,10 +299,37 @@ export const formatGymDataForAPI = (formData) => {
       instagram: formData.socialMedia?.instagram && isValidUrl(formData.socialMedia.instagram) ? formData.socialMedia.instagram : undefined,
       twitter: formData.socialMedia?.twitter && isValidUrl(formData.socialMedia.twitter) ? formData.socialMedia.twitter : undefined
     },
-    tags: [formData.gymType] // Using gymType as tag
+    tags: [formData.gymType], // Using gymType as tag
+    // New fields for comprehensive gym registration
+    selectedWorkouts: formData.selectedWorkouts || [],
+    paymentMethods: formData.paymentMethods || [],
+    paymentProcessor: formData.paymentProcessor,
+    promotions: formData.promotions,
+    registrationFee: {
+      amount: 20, // Default registration fee
+      currency: 'USD',
+      paid: formData.paymentMethod ? true : false,
+      paymentMethod: formData.paymentMethod
+    }
   };
   
   return apiData;
+};
+
+// Workouts (Facilities) management
+export const getGymWorkouts = async (gymId) => {
+  const res = await api.get(`/gyms/${gymId}/workouts`);
+  return res.data;
+};
+
+export const addGymWorkouts = async (gymId, workoutIds) => {
+  const res = await api.post(`/gyms/${gymId}/workouts`, { workoutIds });
+  return res.data;
+};
+
+export const removeGymWorkout = async (gymId, workoutId) => {
+  const res = await api.delete(`/gyms/${gymId}/workouts/${encodeURIComponent(workoutId)}`);
+  return res.data;
 };
 
 // Helper function to validate URL
@@ -322,6 +350,10 @@ export const validateGymData = (formData) => {
   // Required fields validation
   if (!formData.gymName?.trim()) {
     errors.gymName = 'Gym name is required';
+  }
+
+  if (!formData.gymType?.trim()) {
+    errors.gymType = 'Gym type is required';
   }
 
   if (!formData.email?.trim()) {
@@ -350,12 +382,21 @@ export const validateGymData = (formData) => {
     errors.zipCode = 'ZIP code is required';
   }
 
-  if (!formData.facilities || formData.facilities.length === 0) {
-    errors.facilities = 'Please select at least one facility';
+  if (!formData.selectedWorkouts || formData.selectedWorkouts.length === 0) {
+    errors.selectedWorkouts = 'Please select at least one workout';
   }
 
-  if (!formData.classTypes || formData.classTypes.length === 0) {
-    errors.classTypes = 'Please select at least one service type';
+  if (!formData.membershipPlans || formData.membershipPlans.length === 0) {
+    errors.membershipPlans = 'Please add at least one membership plan';
+  } else {
+    formData.membershipPlans.forEach((plan, index) => {
+      if (!plan.name?.trim()) {
+        errors[`membershipPlan.name.${index}`] = 'Plan name is required';
+      }
+      if (!plan.price?.trim()) {
+        errors[`membershipPlan.price.${index}`] = 'Price is required';
+      }
+    });
   }
 
   if (!formData.location || !formData.location.lat || !formData.location.lng) {

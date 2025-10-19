@@ -1,6 +1,6 @@
 import multer from 'multer';
 import path from 'path';
-import { uploadToCloudinary, gymImageOptions, gymLogoOptions, profileImageOptions } from '../config/cloudinary.js';
+import { uploadToCloudinary, gymImageOptions, gymLogoOptions, profileImageOptions, workoutGifOptions } from '../config/cloudinary.js';
 
 // Configure memory storage for Cloudinary upload
 const storage = multer.memoryStorage();
@@ -59,6 +59,9 @@ const instructorUpload = multer({
 
 // Middleware for single image upload
 export const uploadSingle = upload.single('image');
+
+// Middleware for single gif upload (expects field name 'gif')
+export const uploadSingleGif = upload.single('gif');
 
 // Middleware for single logo upload
 export const uploadLogo = upload.single('logo');
@@ -209,13 +212,43 @@ export const uploadProfileImageToCloudinary = async (req, res, next) => {
   }
 };
 
+// Middleware to upload a single GIF to Cloudinary
+export const uploadGifToCloudinary = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No GIF file provided'
+      });
+    }
+
+    // Ensure uploaded file is a gif
+    if (req.file.mimetype !== 'image/gif') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only GIF files are supported'
+      });
+    }
+
+    const uploadedGif = await uploadSingleToCloudinary(req.file, workoutGifOptions);
+    req.uploadedGif = uploadedGif;
+    next();
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload GIF to Cloudinary',
+      error: error.message
+    });
+  }
+};
+
 // Helper function to upload document to Cloudinary
 export const uploadDocumentToCloudinary = async (file) => {
   try {
+    // Use raw resource type for documents to avoid strict format rejections
     const result = await uploadToCloudinary(file.buffer, {
-      resource_type: 'auto', // Auto detect file type
-      folder: 'instructor-documents',
-      allowed_formats: ['pdf', 'doc', 'docx']
+      resource_type: 'raw',
+      folder: 'instructor-documents'
     });
     
     return {

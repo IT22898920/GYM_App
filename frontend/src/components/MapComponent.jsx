@@ -25,7 +25,12 @@ const MapComponent = ({ location, onLocationChange, gyms = [] }) => {
     if (window.google && window.google.maps) {
       setIsGoogleMapsLoaded(true);
     } else {
-      console.warn("Google Maps API not loaded");
+      const existing = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      console.warn("Google Maps API not loaded", {
+        hasWindowGoogle: !!window.google,
+        hasScriptTag: !!existing,
+        scriptSrc: existing?.src
+      });
       setError("Google Maps not available");
       return;
     }

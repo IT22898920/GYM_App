@@ -283,6 +283,37 @@ class NotificationService {
       });
     }
   }
+
+  // Notify all users about new workout GIF upload
+  static async notifyWorkoutGifUploaded(gifData, uploadedBy) {
+    try {
+      // Get all active users
+      const users = await User.find({ isActive: true }).select('_id');
+      
+      if (users.length === 0) return [];
+
+      const notifications = await this.createBulkNotifications({
+        recipients: users.map(u => u._id),
+        sender: uploadedBy,
+        type: 'workout_gif_uploaded',
+        title: 'New Workout Added! 💪',
+        message: `A new workout "${gifData.name}" has been added to the system. Check it out!`,
+        data: { 
+          gifId: gifData._id, 
+          gifName: gifData.name,
+          gifUrl: gifData.url,
+          uploadedBy: uploadedBy
+        },
+        link: '/workouts', // Link to workouts page
+        priority: 'medium'
+      });
+
+      return notifications;
+    } catch (error) {
+      console.error('Error creating workout notifications:', error);
+      throw error;
+    }
+  }
 }
 
 export default NotificationService;

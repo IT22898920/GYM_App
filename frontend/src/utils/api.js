@@ -774,6 +774,53 @@ class ApiService {
     
     return this.handleResponse(response);
   }
+
+  // Customer Profile endpoints
+  async getMyProfile() {
+    const response = await fetch(`${this.baseURL}/members/my-profile`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getMyWorkoutPlans() {
+    const response = await fetch(`${this.baseURL}/members/my-workout-plans`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async updateWorkoutStatus(workoutPlanId, dayIndex, exerciseIndex, workoutStatus) {
+    const response = await fetch(`${this.baseURL}/members/update-workout-status`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({
+        workoutPlanId,
+        dayIndex,
+        exerciseIndex,
+        workoutStatus
+      })
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getInstructorWorkoutPlans() {
+    const response = await fetch(`${this.baseURL}/instructors/workout-plans`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
 }
 
 // Create and export a single instance

@@ -122,6 +122,11 @@ function AdminSidebar({ isOpen }) {
         icon: FiFileText,
         path: "/admin/documents",
       },
+      {
+        title: "Facilities",
+        icon: FiFileText,
+        path: "/admin/facilities",
+      },
     ],
     "gym-owner": [
       {
@@ -133,6 +138,11 @@ function AdminSidebar({ isOpen }) {
         title: "Members",
         icon: FiUsers,
         path: "/gym-owner/members",
+      },
+      {
+        title: "Instructor Members",
+        icon: FiUsers,
+        path: "/gym-owner/instructor-members",
       },
       {
         title: "Your Gym's Instructors",
@@ -174,6 +184,11 @@ function AdminSidebar({ isOpen }) {
         icon: FiMessageSquare,
         path: "/gym-owner/messages",
         badge: "5",
+      },
+      {
+        title: "Facilities",
+        icon: FiFileText,
+        path: "/gym-owner/facilities",
       },
     ],
     instructor: [

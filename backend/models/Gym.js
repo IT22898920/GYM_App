@@ -7,6 +7,12 @@ const gymSchema = new mongoose.Schema({
     trim: true,
     maxlength: [100, 'Gym name cannot exceed 100 characters']
   },
+  gymType: {
+    type: String,
+    required: [true, 'Gym type is required'],
+    trim: true,
+    enum: ['Fitness Center', 'Yoga Studio', 'CrossFit Box', 'Martial Arts Dojo', 'Personal Training Studio', 'Wellness Center', 'Sports Complex']
+  },
   description: {
     type: String,
     required: [true, 'Gym description is required'],
@@ -191,6 +197,47 @@ const gymSchema = new mongoose.Schema({
     instagram: String,
     twitter: String,
     youtube: String
+  },
+  // New fields for comprehensive gym registration
+  selectedWorkouts: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Gif'
+  }],
+  paymentMethods: [{
+    type: String,
+    enum: ['Credit Cards', 'Debit Cards', 'Bank Transfer', 'Cash', 'Digital Wallets', 'Automatic Payments']
+  }],
+  paymentProcessor: {
+    type: String,
+    enum: ['Stripe', 'PayPal', 'Square', 'Other']
+  },
+  promotions: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Promotions cannot exceed 500 characters']
+  },
+  registrationFee: {
+    amount: {
+      type: Number,
+      default: 20
+    },
+    currency: {
+      type: String,
+      default: 'USD'
+    },
+    paid: {
+      type: Boolean,
+      default: false
+    },
+    paymentMethod: {
+      type: String,
+      enum: {
+        values: ['card', 'manual', 'bank', ''],
+        message: 'Invalid payment method for registration fee'
+      },
+      default: null
+    },
+    paidAt: Date
   },
   bankAccount: {
     accountHolderName: {

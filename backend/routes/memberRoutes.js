@@ -13,7 +13,10 @@ import {
   uploadReceipt,
   confirmCustomerPayment,
   searchExistingUsers,
-  addExistingUserAsMember
+  addExistingUserAsMember,
+  getMyProfile,
+  getMyWorkoutPlans,
+  updateWorkoutStatus
 } from '../controllers/memberController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -22,7 +25,12 @@ const router = express.Router();
 // Public route for customer registration
 router.post('/register/:gymId', uploadReceipt, registerCustomerToGym);
 
-// All routes require authentication and gym owner authorization
+// Customer-specific routes (require authentication)
+router.get('/my-profile', protect, authorize('customer'), getMyProfile);
+router.get('/my-workout-plans', protect, authorize('customer'), getMyWorkoutPlans);
+router.patch('/update-workout-status', protect, authorize('customer'), updateWorkoutStatus);
+
+// All routes below require authentication and gym owner authorization
 router.use(protect);
 router.use(authorize('gymOwner'));
 

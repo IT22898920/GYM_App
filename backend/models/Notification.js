@@ -61,9 +61,15 @@ const notificationSchema = new mongoose.Schema({
       'class_booking_confirmed',
       'class_booking_cancelled',
       
+      // Workout related
+      'workout_gif_uploaded',
+      'workout_plan_assigned',
+      
       // Member related
       'member_joined_gym',
       'member_left_gym',
+      'instructor_assigned',
+      'member_assigned',
       'membership_expiring',
       'membership_expired',
       

@@ -54,6 +54,7 @@ function RegisterGym() {
     termsAccepted: false,
     privacyAccepted: false,
     paymentMethod: "", // Added for registration fee payment method
+    selectedWorkouts: [],
   });
 
   const [errors, setErrors] = useState({});
@@ -67,6 +68,11 @@ function RegisterGym() {
     logo: null,
     photos: [],
   });
+  // Workouts (GIFs) state
+  const [workouts, setWorkouts] = useState([]);
+  const [workoutsLoading, setWorkoutsLoading] = useState(false);
+  const [workoutsError, setWorkoutsError] = useState("");
+  const [selectedWorkout, setSelectedWorkout] = useState(null);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -238,6 +244,47 @@ function RegisterGym() {
     }));
   };
 
+  const toggleWorkoutSelection = (workoutId) => {
+    setFormData((prev) => {
+      const isSelected = prev.selectedWorkouts.includes(workoutId);
+      return {
+        ...prev,
+        selectedWorkouts: isSelected
+          ? prev.selectedWorkouts.filter((id) => id !== workoutId)
+          : [...prev.selectedWorkouts, workoutId],
+      };
+    });
+    if (errors.selectedWorkouts) {
+      setErrors((prev) => ({ ...prev, selectedWorkouts: "" }));
+    }
+  };
+
+  // Fetch workouts when user reaches step 2
+  useEffect(() => {
+    const fetchWorkouts = async () => {
+      try {
+        setWorkoutsLoading(true);
+        setWorkoutsError("");
+        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${apiBase}/gifs`);
+        const data = await res.json();
+        if (data.success) {
+          setWorkouts(data.data || []);
+        } else {
+          setWorkoutsError(data.message || 'Failed to load workouts');
+        }
+      } catch (err) {
+        setWorkoutsError('Failed to load workouts');
+      } finally {
+        setWorkoutsLoading(false);
+      }
+    };
+
+    if (currentStep === 2) {
+      fetchWorkouts();
+    }
+  }, [currentStep]);
+
   const validateCurrentStep = () => {
     const newErrors = {};
 
@@ -262,10 +309,9 @@ function RegisterGym() {
         break;
 
       case 2: // Facilities & Classes
-        if (formData.facilities.length === 0)
-          newErrors.facilities = "Please select at least one facility";
-        if (formData.classTypes.length === 0)
-          newErrors.classTypes = "Please select at least one class type";
+        // Require at least one workout to be selected
+        if (!formData.selectedWorkouts || formData.selectedWorkouts.length === 0)
+          newErrors.selectedWorkouts = "Please select at least one workout";
         break;
 
       case 3: // Membership & Pricing
@@ -650,44 +696,52 @@ function RegisterGym() {
             <h2 className="text-2xl font-semibold text-white">
               Facilities & Classes
             </h2>
+            {/* Available Facilities replaced by Admin Workouts */}
             <div className="space-y-4">
               <label className="block text-gray-300 mb-4">
-                Available Facilities
+                Available Workouts
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {facilityOptions.map((facility) => (
-                  <label
-                    key={facility}
-                    className="flex items-center space-x-3 p-4 rounded-lg bg-gray-900/50 border border-gray-700 cursor-pointer hover:bg-gray-800/50 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      name="facilities"
-                      value={facility}
-                      checked={formData.facilities.includes(facility)}
-                      onChange={handleChange}
-                      className="hidden"
-                    />
+
+              {workoutsLoading ? (
+                <div className="text-gray-400">Loading workouts...</div>
+              ) : workoutsError ? (
+                <div className="text-red-400">{workoutsError}</div>
+              ) : workouts.length === 0 ? (
+                <div className="text-gray-400">No workouts available</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {workouts.map((w) => (
                     <div
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                        formData.facilities.includes(facility)
-                          ? "bg-violet-500 border-violet-500"
-                          : "border-gray-600"
-                      }`}
+                      key={w._id}
+                      className="w-full p-3 rounded-lg bg-gray-900/50 border border-gray-700 flex items-start justify-between gap-3"
                     >
-                      {formData.facilities.includes(facility) && (
-                        <FiCheck className="w-3 h-3 text-white" />
-                      )}
+                      <label className="flex items-start gap-3 cursor-pointer select-none flex-1">
+                        <input
+                          type="checkbox"
+                          checked={formData.selectedWorkouts.includes(w._id)}
+                          onChange={() => toggleWorkoutSelection(w._id)}
+                          className="mt-1"
+                        />
+                        <span className="text-violet-300 font-medium">{w.name}</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedWorkout(w)}
+                        className="text-sm text-gray-300 hover:text-white underline"
+                      >
+                        Preview
+                      </button>
                     </div>
-                    <span className="text-gray-300">{facility}</span>
-                  </label>
-                ))}
-              </div>
-              {errors.facilities && (
-                <p className="text-red-500 text-sm">{errors.facilities}</p>
+                  ))}
+                </div>
+              )}
+              {errors.selectedWorkouts && (
+                <p className="text-red-500 text-sm">{errors.selectedWorkouts}</p>
               )}
             </div>
-            <div className="space-y-4">
+
+            {/* Available Classes */}
+            {/* <div className="space-y-4">
               <label className="block text-gray-300 mb-4">
                 Available Classes
               </label>
@@ -723,7 +777,32 @@ function RegisterGym() {
               {errors.classTypes && (
                 <p className="text-red-500 text-sm">{errors.classTypes}</p>
               )}
-            </div>
+            </div> */}
+
+            {/* Workout Preview Modal */}
+            {selectedWorkout && (
+              <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                <div className="bg-gray-900 rounded-xl border border-gray-700 max-w-3xl w-full overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+                    <h3 className="text-white font-semibold">{selectedWorkout.name}</h3>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWorkout(null)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="bg-black flex items-center justify-center">
+                    <img
+                      src={selectedWorkout.url}
+                      alt={selectedWorkout.name}
+                      className="max-h-[70vh] object-contain"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       case 3:
@@ -998,6 +1077,11 @@ function RegisterGym() {
                   location={formData.location}
                   onLocationChange={handleLocationChange}
                 />
+              </div>
+              {/* Debug info for Google Maps */}
+              <div className="text-xs text-gray-500 mt-2">
+                <div>Debug: location lat/lng → {String(formData.location?.lat)} , {String(formData.location?.lng)}</div>
+                <div>Debug: maps loaded → {String(!!window.google && !!window.google.maps)}</div>
               </div>
             </div>
           </div>

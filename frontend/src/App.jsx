@@ -54,6 +54,8 @@ import UpdateLocation from "./pages/gymowner/UpdateLocation";
 import ContactInfo from "./pages/gymowner/ContactInfo";
 import GymOwnerMessages from "./pages/gymowner/Messages";
 import BankAccount from "./pages/gymowner/BankAccount";
+import GymOwnerFacilities from "./pages/gymowner/Facilities";
+import InstructorMembers from "./pages/gymowner/InstructorMembers";
 
 // Instructor Routes
 import InstructorLayout from "./layouts/InstructorLayout";
@@ -85,6 +87,8 @@ import InstructorMessages from "./pages/instructor/Messages";
 import FinanceAdmin from "./pages/admin/Finance";
 import CustomerRegisterGym from "./pages/CustomerRegisterGym";
 import GymRegistrations from "./pages/admin/GymRegistrations";
+import Gif from "./pages/admin/Gif";
+import AdminFacilities from "./pages/admin/Facilities";
 
 
 function App() {
@@ -128,6 +132,8 @@ function AppContent() {
           <Route path="payments" element={<Pricing />} />
           <Route path="finance" element={<FinanceAdmin />} />
           <Route path="gym-registrations" element={<GymRegistrations />} />
+          <Route path="facilities" element={<Gif />} />
+          <Route path="gym-workouts" element={<AdminFacilities />} />
 
           <Route
             path="instructor-applications"
@@ -147,6 +153,7 @@ function AppContent() {
           <Route path="instructors/:instructorId/edit" element={<EditInstructor />} />
           <Route path="classes" element={<GymOwnerClasses />} />
           <Route path="members" element={<GymOwnerMembers />} />
+          <Route path="instructor-members" element={<InstructorMembers />} />
           <Route path="settings" element={<GymOwnerSettings />} />
           <Route path="profile" element={<Profile />} />
           <Route path="addInstructor" element={<AddInstructor />} />
@@ -158,6 +165,7 @@ function AppContent() {
           <Route path="manage-images" element={<ManageImages />} />
           <Route path="update-location" element={<UpdateLocation />} />
           <Route path="contact-info" element={<ContactInfo />} />
+          <Route path="facilities" element={<GymOwnerFacilities />} />
           <Route path="messages" element={<GymOwnerMessages />} />
           <Route path="bank-account" element={<BankAccount />} />
 
