@@ -1303,7 +1303,7 @@ export const updateWorkoutStatus = async (req, res) => {
     } else {
       // Debug: Check if workout plan exists but with different student
       const allPlans = await MemberWorkoutPlan.find({ _id: workoutPlanId });
-      console.log('🔍 All plans with this ID:', allPlans.length);
+      console.log('🔍 All workout plans with this ID:', allPlans.length);
       if (allPlans.length > 0) {
         console.log('🔍 Plan exists but student mismatch:', {
           planStudent: allPlans[0].student,
