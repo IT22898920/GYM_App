@@ -462,6 +462,18 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // Create member-instructor chat collaboration
+  async createMemberInstructorChat(instructorId) {
+    const response = await fetch(`${this.baseURL}/collaborations/member-instructor`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ instructorId })
+    });
+    
+    return this.handleResponse(response);
+  }
+
   // Member endpoints
   async searchExistingUsers(searchTerm, searchType) {
     const params = new URLSearchParams({

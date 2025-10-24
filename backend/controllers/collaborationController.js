@@ -3,6 +3,7 @@ import InstructorApplication from '../models/InstructorApplication.js';
 import Gym from '../models/Gym.js';
 import User from '../models/User.js';
 import Chat from '../models/Chat.js';
+import Member from '../models/Member.js';
 import NotificationService from '../services/notificationService.js';
 
 // Send collaboration request to instructor
@@ -331,6 +332,91 @@ export const cancelRequest = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to cancel request',
+      error: error.message
+    });
+  }
+};
+
+// Create member-instructor chat collaboration
+export const createMemberInstructorChat = async (req, res) => {
+  try {
+    const { instructorId } = req.body;
+    const customerId = req.user.id;
+
+    // Validate request data
+    if (!instructorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Instructor ID is required'
+      });
+    }
+
+    // Find the member record linked to this customer user
+    const member = await Member.findOne({ user: customerId }).populate('assignedInstructor');
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member profile not found. Please register as a member first.'
+      });
+    }
+
+    if (!member.assignedInstructor || member.assignedInstructor._id.toString() !== instructorId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only chat with your assigned instructor'
+      });
+    }
+
+    // Check if collaboration request already exists
+    let collaborationRequest = await CollaborationRequest.findOne({
+      fromMember: customerId,
+      toInstructor: instructorId,
+      status: { $in: ['pending', 'accepted'] }
+    });
+
+    if (!collaborationRequest) {
+      // Create new collaboration request
+      collaborationRequest = new CollaborationRequest({
+        fromMember: customerId,
+        toInstructor: instructorId,
+        gym: member.gym,
+        message: 'Member-Instructor Communication',
+        status: 'accepted', // Auto-accept for assigned instructors
+        acceptedAt: new Date()
+      });
+
+      await collaborationRequest.save();
+
+      // Create chat for the collaboration
+      const chat = new Chat({
+        participants: [customerId, instructorId],
+        collaborationRequest: collaborationRequest._id,
+        gym: member.gym,
+        messages: []
+      });
+
+      await chat.save();
+    }
+
+    // Populate the response
+    const populatedRequest = await CollaborationRequest.findById(collaborationRequest._id)
+      .populate('fromMember', 'firstName lastName email')
+      .populate('toInstructor', 'firstName lastName email')
+      .populate('gym', 'gymName');
+
+    console.log('Created collaboration request:', populatedRequest);
+
+    res.status(200).json({
+      success: true,
+      message: 'Member-instructor chat collaboration created successfully',
+      data: populatedRequest
+    });
+
+  } catch (error) {
+    console.error('Error creating member-instructor chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create member-instructor chat',
       error: error.message
     });
   }

@@ -19,8 +19,12 @@ import {
   FiX,
   FiSun,
   FiSunrise,
+  FiMessageCircle,
 } from "react-icons/fi";
 import api from "../utils/api";
+import Chat from "../components/Chat";
+import { useCall } from "../contexts/CallContext";
+import { useAlert } from "../contexts/AlertContext";
 
 function CustomerProfile() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -28,6 +32,12 @@ function CustomerProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showChat, setShowChat] = useState(false);
+  const [collaborationId, setCollaborationId] = useState(null);
+  const [assignedInstructor, setAssignedInstructor] = useState(null);
+
+  const { initiateCall } = useCall();
+  const { showAlert } = useAlert();
 
   // User data - will be populated from backend
   const [userData, setUserData] = useState(null);
@@ -42,6 +52,11 @@ function CustomerProfile() {
         if (response.success) {
           const member = response.data;
           
+          // Store assigned instructor data for chat/call functionality
+          if (member.assignedInstructor) {
+            setAssignedInstructor(member.assignedInstructor);
+          }
+
           // Transform backend data to match the UI structure
           const transformedData = {
             name: `${member.firstName} ${member.lastName}`,
@@ -104,6 +119,64 @@ function CustomerProfile() {
   const handleCancel = () => {
     setIsEditing(false);
     // Reset form data
+  };
+
+  // Handle chat with assigned instructor
+  const handleChatWithInstructor = async () => {
+    if (!assignedInstructor) {
+      showAlert('No instructor assigned to you', 'error');
+      return;
+    }
+
+    try {
+      // Create or get collaboration request for chat
+      const response = await api.createMemberInstructorChat(assignedInstructor._id);
+      console.log('Chat creation response:', response);
+      
+      if (response.success) {
+        console.log('Collaboration data:', response.data);
+        setCollaborationId(response.data._id);
+        setShowChat(true);
+      }
+    } catch (error) {
+      console.error('Error creating chat:', error);
+      showAlert('Failed to start chat with instructor', 'error');
+    }
+  };
+
+  // Handle voice call with assigned instructor
+  const handleVoiceCall = async () => {
+    if (!assignedInstructor) {
+      showAlert('No instructor assigned to you', 'error');
+      return;
+    }
+
+    try {
+      // First create/get collaboration and chat
+      const collaborationResponse = await api.createMemberInstructorChat(assignedInstructor._id);
+      if (!collaborationResponse.success) {
+        throw new Error('Failed to create collaboration');
+      }
+
+      // Get the chat for this collaboration
+      const chatResponse = await api.getOrCreateChat(collaborationResponse.data._id);
+      if (!chatResponse.success) {
+        throw new Error('Failed to get chat');
+      }
+
+      // Now initiate the call with the chat ID
+      await initiateCall(chatResponse.data._id, 'voice', assignedInstructor);
+    } catch (error) {
+      console.error('Error initiating voice call:', error);
+      showAlert('Failed to start voice call', 'error');
+    }
+  };
+
+
+  // Close chat modal
+  const closeChat = () => {
+    setShowChat(false);
+    setCollaborationId(null);
   };
 
   const renderOverview = () => (
@@ -210,9 +283,31 @@ function CustomerProfile() {
           <h3 className="text-lg font-semibold text-white mb-6">
             Assigned Instructor
           </h3>
-          <div className="flex items-center text-gray-400">
-            <FiUser className="w-5 h-5 mr-3 text-violet-400" />
-            <span>{userData.instructor || 'Not assigned yet'}</span>
+          <div className="space-y-4">
+            <div className="flex items-center text-gray-400">
+              <FiUser className="w-5 h-5 mr-3 text-violet-400" />
+              <span>{userData.instructor || 'Not assigned yet'}</span>
+            </div>
+            
+            {/* Chat and Call buttons - only show if instructor is assigned */}
+            {assignedInstructor && (
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={handleChatWithInstructor}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors"
+                >
+                  <FiMessageCircle className="w-4 h-4" />
+                  <span>Chat</span>
+                </button>
+                <button
+                  onClick={handleVoiceCall}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition-colors"
+                >
+                  <FiPhone className="w-4 h-4" />
+                  <span>Call</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -623,6 +718,31 @@ function CustomerProfile() {
           {activeTab === "progress" && renderProgress()}
         </div>
       </div>
+
+      {/* Chat Modal */}
+      {showChat && collaborationId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Chat with {assignedInstructor?.firstName} {assignedInstructor?.lastName}
+              </h3>
+              <button
+                onClick={closeChat}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <FiX className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-4">
+              <Chat 
+                collaborationId={collaborationId} 
+                onClose={closeChat}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
