@@ -840,6 +840,22 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  async deleteMemberNote(workoutPlanId, dayIndex, exerciseIndex, noteIndex) {
+    const response = await fetch(`${this.baseURL}/members/delete-member-note`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({
+        workoutPlanId,
+        dayIndex,
+        exerciseIndex,
+        noteIndex
+      })
+    });
+    
+    return this.handleResponse(response);
+  }
+
   async getInstructorWorkoutPlans() {
     const response = await fetch(`${this.baseURL}/instructors/workout-plans`, {
       method: 'GET',

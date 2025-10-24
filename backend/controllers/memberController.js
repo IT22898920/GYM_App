@@ -1465,3 +1465,96 @@ export const addMemberNote = async (req, res) => {
     });
   }
 };
+
+// Delete member note from exercise
+export const deleteMemberNote = async (req, res) => {
+  try {
+    const { workoutPlanId, dayIndex, exerciseIndex, noteIndex } = req.body;
+    const userId = req.user.id;
+
+    console.log('🗑️ Delete member note request:', {
+      workoutPlanId,
+      dayIndex,
+      exerciseIndex,
+      noteIndex,
+      userId
+    });
+
+    // Find the member record for this user
+    const member = await Member.findOne({ user: userId });
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member profile not found'
+      });
+    }
+
+    // Import MemberWorkoutPlan model
+    const MemberWorkoutPlan = (await import('../models/MemberWorkoutPlan.js')).default;
+
+    // Find the workout plan and verify it belongs to this member
+    const workoutPlan = await MemberWorkoutPlan.findOne({
+      _id: workoutPlanId,
+      student: member._id
+    });
+
+    if (!workoutPlan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workout plan not found or not assigned to you'
+      });
+    }
+
+    // Validate indices
+    if (!workoutPlan.schedule[dayIndex] || !workoutPlan.schedule[dayIndex].exercises[exerciseIndex]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid exercise index'
+      });
+    }
+
+    const exercise = workoutPlan.schedule[dayIndex].exercises[exerciseIndex];
+    
+    // Check if exercise has notes
+    if (!exercise.memberNotes || exercise.memberNotes.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No notes found for this exercise'
+      });
+    }
+
+    // Validate note index
+    if (noteIndex < 0 || noteIndex >= exercise.memberNotes.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid note index'
+      });
+    }
+
+    // Store the note content for response
+    const deletedNote = exercise.memberNotes[noteIndex];
+
+    // Remove the note
+    exercise.memberNotes.splice(noteIndex, 1);
+
+    await workoutPlan.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Note deleted successfully',
+      data: {
+        deletedNote: deletedNote.note,
+        remainingNotes: exercise.memberNotes.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting member note:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete note',
+      error: error.message
+    });
+  }
+};

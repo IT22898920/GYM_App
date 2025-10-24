@@ -14,6 +14,7 @@ import {
   FiChevronUp,
   FiMessageSquare,
   FiPlus,
+  FiTrash2,
 } from "react-icons/fi";
 import api from "../utils/api";
 
@@ -448,6 +449,64 @@ function ViewMyWorkout() {
     setNoteText('');
   };
 
+  // Delete note from exercise
+  const deleteNoteFromExercise = async (planId, dayIndex, exerciseIndex, noteIndex) => {
+    if (!window.confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      console.log('Deleting note:', { planId, dayIndex, exerciseIndex, noteIndex });
+
+      // Call API to delete note
+      const response = await api.deleteMemberNote(planId, dayIndex, exerciseIndex, noteIndex);
+      
+      if (response.success) {
+        console.log('Note deleted successfully:', response);
+        
+        // Update local state to remove the note
+        setWorkoutPlans((prev) =>
+          prev.map((plan) => {
+            if (plan.id === planId) {
+              const updatedSchedule = plan.schedule.map((day, dIndex) => {
+                if (dIndex === dayIndex) {
+                  return {
+                    ...day,
+                    exercises: day.exercises.map((exercise, eIndex) => {
+                      if (eIndex === exerciseIndex) {
+                        return {
+                          ...exercise,
+                          memberNotes: exercise.memberNotes.filter((_, index) => index !== noteIndex)
+                        };
+                      }
+                      return exercise;
+                    }),
+                  };
+                }
+                return day;
+              });
+
+              return {
+                ...plan,
+                schedule: updatedSchedule
+              };
+            }
+            return plan;
+          })
+        );
+
+        console.log(`✅ Note deleted successfully`);
+        alert('Note deleted successfully!');
+      } else {
+        console.error('Failed to delete note:', response.message);
+        alert(response.message || 'Failed to delete note. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      alert('Error deleting note. Please try again.');
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
@@ -854,11 +913,22 @@ function ViewMyWorkout() {
                                               </div>
                                               <div className="space-y-2">
                                                 {exercise.memberNotes.map((note, noteIndex) => (
-                                                  <div key={noteIndex} className="text-sm text-gray-300 bg-gray-800/50 p-2 rounded">
-                                                    <p>{note.note}</p>
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                      {new Date(note.createdAt).toLocaleString()}
-                                                    </p>
+                                                  <div key={noteIndex} className="text-sm text-gray-300 bg-gray-800/50 p-2 rounded group">
+                                                    <div className="flex items-start justify-between">
+                                                      <div className="flex-1">
+                                                        <p>{note.note}</p>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                          {new Date(note.createdAt).toLocaleString()}
+                                                        </p>
+                                                      </div>
+                                                      <button
+                                                        onClick={() => deleteNoteFromExercise(plan.id, dayIndex, exerciseIndex, noteIndex)}
+                                                        className="ml-2 p-1 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                                                        title="Delete this note"
+                                                      >
+                                                        <FiTrash2 className="w-3 h-3" />
+                                                      </button>
+                                                    </div>
                                                   </div>
                                                 ))}
                                               </div>
