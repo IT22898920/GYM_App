@@ -824,6 +824,22 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  async addMemberNote(workoutPlanId, dayIndex, exerciseIndex, note) {
+    const response = await fetch(`${this.baseURL}/members/add-member-note`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({
+        workoutPlanId,
+        dayIndex,
+        exerciseIndex,
+        note
+      })
+    });
+    
+    return this.handleResponse(response);
+  }
+
   async getInstructorWorkoutPlans() {
     const response = await fetch(`${this.baseURL}/instructors/workout-plans`, {
       method: 'GET',

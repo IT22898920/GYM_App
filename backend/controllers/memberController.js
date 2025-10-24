@@ -1376,3 +1376,92 @@ export const updateWorkoutStatus = async (req, res) => {
     });
   }
 };
+
+// Add member note to exercise
+export const addMemberNote = async (req, res) => {
+  try {
+    const { workoutPlanId, dayIndex, exerciseIndex, note } = req.body;
+    const userId = req.user.id;
+
+    console.log('📝 Add member note request:', {
+      workoutPlanId,
+      dayIndex,
+      exerciseIndex,
+      note,
+      userId
+    });
+
+    // Find the member record for this user
+    const member = await Member.findOne({ user: userId });
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member profile not found'
+      });
+    }
+
+    // Import MemberWorkoutPlan model
+    const MemberWorkoutPlan = (await import('../models/MemberWorkoutPlan.js')).default;
+
+    // Find the workout plan and verify it belongs to this member
+    const workoutPlan = await MemberWorkoutPlan.findOne({
+      _id: workoutPlanId,
+      student: member._id
+    });
+
+    if (!workoutPlan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workout plan not found or not assigned to you'
+      });
+    }
+
+    // Validate indices
+    if (!workoutPlan.schedule[dayIndex] || !workoutPlan.schedule[dayIndex].exercises[exerciseIndex]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid exercise index'
+      });
+    }
+
+    // Check if exercise is completed - prevent adding notes to completed exercises
+    const exercise = workoutPlan.schedule[dayIndex].exercises[exerciseIndex];
+    if (exercise.workoutStatus === 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot add notes to completed exercises'
+      });
+    }
+
+    // Add the note to the exercise
+    if (!exercise.memberNotes) {
+      exercise.memberNotes = [];
+    }
+    
+    exercise.memberNotes.push({
+      note: note.trim(),
+      createdAt: new Date()
+    });
+
+    await workoutPlan.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Note added successfully',
+      data: {
+        note: note.trim(),
+        createdAt: new Date(),
+        totalNotes: exercise.memberNotes.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error adding member note:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to add note',
+      error: error.message
+    });
+  }
+};
