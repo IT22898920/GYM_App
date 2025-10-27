@@ -90,6 +90,7 @@ function CreateWorkoutPlan() {
         id: member._id,
         name: `${member.firstName} ${member.lastName}`,
         email: member.email,
+        isFreelance: member.isFreelance || false,
         memberData: member
       }));
       setStudents(transformedStudents);
@@ -533,7 +534,7 @@ function CreateWorkoutPlan() {
                   </option>
                   {students.map((student) => (
                     <option key={student.id} value={student.id}>
-                      {student.name}
+                      {student.name} ({student.isFreelance ? "Freelancing" : "Not Freelancing"})
                     </option>
                   ))}
                 </select>

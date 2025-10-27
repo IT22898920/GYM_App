@@ -865,6 +865,95 @@ class ApiService {
     
     return this.handleResponse(response);
   }
+
+  // Class management methods
+  async createClass(classData) {
+    const response = await fetch(`${this.baseURL}/classes`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(classData),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getInstructorClasses(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString 
+      ? `${this.baseURL}/classes?${queryString}`
+      : `${this.baseURL}/classes`;
+      
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getClassById(classId) {
+    const response = await fetch(`${this.baseURL}/classes/${classId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async updateClass(classId, classData) {
+    const response = await fetch(`${this.baseURL}/classes/${classId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(classData),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async deleteClass(classId) {
+    const response = await fetch(`${this.baseURL}/classes/${classId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async addMemberToClass(classId, memberId) {
+    const response = await fetch(`${this.baseURL}/classes/${classId}/members`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ memberId }),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async removeMemberFromClass(classId, memberId) {
+    const response = await fetch(`${this.baseURL}/classes/${classId}/members/${memberId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async getClassEligibleMembers() {
+    const response = await fetch(`${this.baseURL}/classes/eligible-members`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
 }
 
 // Create and export a single instance

@@ -811,9 +811,23 @@ export const getAssignedMembers = async (req, res) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Check if this instructor is freelance
+    const instructorApplication = await InstructorApplication.findOne({
+      applicant: instructorId,
+      status: 'approved'
+    });
+
+    const isInstructorFreelance = instructorApplication?.isFreelance || false;
+
+    // Add freelancing info to each member
+    const membersWithFreelanceInfo = members.map(member => ({
+      ...member.toObject(),
+      isFreelance: isInstructorFreelance
+    }));
+
     res.status(200).json({
       success: true,
-      data: members,
+      data: membersWithFreelanceInfo,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(totalMembers / limit),
