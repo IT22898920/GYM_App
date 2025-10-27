@@ -954,6 +954,22 @@ class ApiService {
     
     return this.handleResponse(response);
   }
+
+  // Get instructor's assigned members (for GymStudents page)
+  async getInstructorAssignedMembers(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString 
+      ? `${this.baseURL}/instructors/assigned-members?${queryString}`
+      : `${this.baseURL}/instructors/assigned-members`;
+      
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    
+    return this.handleResponse(response);
+  }
 }
 
 // Create and export a single instance
