@@ -18,7 +18,8 @@ export const createClass = async (req, res) => {
       price,
       capacity,
       location,
-      package: packageName = 'standard'
+      package: packageName = 'standard',
+      members: initialMembers
     } = req.body;
 
     // Validate required fields
@@ -61,6 +62,55 @@ export const createClass = async (req, res) => {
     });
 
     await newClass.save();
+
+    // If initial members are provided, attempt to add them and notify
+    if (Array.isArray(initialMembers) && initialMembers.length > 0) {
+      const uniqueMemberIds = [...new Set(initialMembers.map(m => m.toString()))];
+
+      const instructor = await User.findById(instructorId);
+
+      for (const memberId of uniqueMemberIds) {
+        try {
+          const member = await Member.findById(memberId);
+          if (!member) continue;
+
+          // Ensure member is assigned to this instructor
+          if (!member.assignedInstructor || member.assignedInstructor.toString() !== instructorId) continue;
+
+          // Add member to class (respect capacity and duplicates)
+          try {
+            await newClass.addMember(memberId);
+          } catch (e) {
+            // skip if duplicate or class full
+            continue;
+          }
+
+          // Notify mapped user if exists
+          if (member.user) {
+            await NotificationService.createNotification({
+              recipient: member.user,
+              sender: instructorId,
+              type: 'class_enrolled',
+              title: 'Enrolled in Class! 🎯',
+              message: `${instructor.firstName} ${instructor.lastName} enrolled you in class: "${newClass.name}"`,
+              data: {
+                classId: newClass._id,
+                className: newClass.name,
+                classDate: newClass.date,
+                classTime: newClass.time,
+                instructorId: instructorId,
+                instructorName: `${instructor.firstName} ${instructor.lastName}`
+              },
+              link: '/customer/class-schedule',
+              priority: 'medium'
+            });
+          }
+        } catch (memberAddErr) {
+          // continue processing others
+          continue;
+        }
+      }
+    }
 
     // Populate references for response
     const populatedClass = await Class.findById(newClass._id)
@@ -394,6 +444,35 @@ export const removeMemberFromClass = async (req, res) => {
 
     // Remove member from class
     await classObj.removeMember(memberId);
+
+    // Notify the removed member if they have a mapped user
+    try {
+      const [member, instructor] = await Promise.all([
+        Member.findById(memberId),
+        User.findById(instructorId)
+      ]);
+      if (member && member.user) {
+        await NotificationService.createNotification({
+          recipient: member.user,
+          sender: instructorId,
+          type: 'class_member_removed',
+          title: 'Removed from Class',
+          message: `${instructor.firstName} ${instructor.lastName} removed you from class: "${classObj.name}"`,
+          data: {
+            classId: classObj._id,
+            className: classObj.name,
+            classDate: classObj.date,
+            classTime: classObj.time,
+            instructorId: instructorId,
+            instructorName: `${instructor.firstName} ${instructor.lastName}`
+          },
+          priority: 'medium'
+        });
+      }
+    } catch (notificationError) {
+      // log and proceed without failing the request
+      console.error('Error creating class member removal notification:', notificationError);
+    }
 
     res.status(200).json({
       success: true,

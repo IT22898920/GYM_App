@@ -661,6 +661,17 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // Admin - Users
+  async getUsersAdmin(params = {}) {
+    const queryParams = new URLSearchParams(params);
+    const response = await fetch(`${this.baseURL}/users/admin?${queryParams}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    return this.handleResponse(response);
+  }
+
   async getOrCreateChat(collaborationId) {
     const response = await fetch(`${this.baseURL}/chats/collaboration/${collaborationId}`, {
       method: 'GET',

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../../utils/api";
 import { Link } from "react-router-dom";
 import {
   FiSearch,
@@ -25,6 +26,9 @@ function Customers() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
 
   const stats = [
     {
@@ -65,18 +69,28 @@ function Customers() {
     },
   ];
 
-  // Sample data for customers
-  const customers = Array.from({ length: 50 }, (_, i) => ({
-    id: i + 1,
-    name: `Customer ${i + 1}`,
-    email: `customer${i + 1}@example.com`,
-    membershipPlan: ["Basic", "Premium", "Pro"][Math.floor(Math.random() * 3)],
-    joinDate: "2024-02-01",
-    lastVisit: "2024-02-20 10:00",
-    status: Math.random() > 0.2 ? "active" : "inactive",
-    visitsThisMonth: Math.floor(Math.random() * 30),
-    avatar: `https://i.pravatar.cc/150?img=${i % 70}`,
-  }));
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setLoading(true);
+      try {
+        const res = await api.getUsersAdmin({
+          role: 'customer',
+          status: selectedStatus,
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm
+        });
+        setCustomers(res.data || []);
+        setTotalItems(res.pagination?.totalItems || 0);
+      } catch (e) {
+        setCustomers([]);
+        setTotalItems(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCustomers();
+  }, [selectedStatus, currentPage, itemsPerPage, searchTerm]);
 
   const statusOptions = [
     { value: "all", label: "All Status" },
@@ -84,22 +98,9 @@ function Customers() {
     { value: "inactive", label: "Inactive" },
   ];
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      selectedStatus === "all" || customer.status === selectedStatus;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // Pagination calculations
-  const totalItems = filteredCustomers.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentCustomers = filteredCustomers.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -237,21 +238,21 @@ function Customers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {currentCustomers.map((customer) => (
+              {customers.map((customer) => (
                 <tr
-                  key={customer.id}
+                  key={customer._id}
                   className="hover:bg-gray-700/20 transition-colors"
                 >
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
                       <img
-                        src={customer.avatar}
-                        alt={customer.name}
+                        src={customer.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent((customer.firstName||'')[0]||'U')}`}
+                        alt={customer.firstName}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div>
                         <div className="font-medium text-white">
-                          {customer.name}
+                          {customer.firstName} {customer.lastName}
                         </div>
                         <div className="text-sm text-gray-400">
                           {customer.email}
@@ -260,34 +261,24 @@ function Customers() {
                     </div>
                   </td>
                   <td className="p-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        customer.membershipPlan === "Premium"
-                          ? "bg-violet-500/10 text-violet-400"
-                          : customer.membershipPlan === "Pro"
-                          ? "bg-blue-500/10 text-blue-400"
-                          : "bg-gray-500/10 text-gray-400"
-                      }`}
-                    >
-                      {customer.membershipPlan}
-                    </span>
+                    <span className="text-gray-300">-</span>
                   </td>
-                  <td className="p-4 text-gray-300">{customer.joinDate}</td>
-                  <td className="p-4 text-gray-300">{customer.lastVisit}</td>
+                  <td className="p-4 text-gray-300">{customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : '-'}</td>
+                  <td className="p-4 text-gray-300">-</td>
                   <td className="p-4">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-                        customer.status === "active"
+                        customer.isActive
                           ? "bg-green-500/10 text-green-400"
                           : "bg-red-500/10 text-red-400"
                       }`}
                     >
-                      {customer.status === "active" ? (
+                      {customer.isActive ? (
                         <FiCheck className="w-4 h-4 mr-1" />
                       ) : (
                         <FiX className="w-4 h-4 mr-1" />
                       )}
-                      {customer.status}
+                      {customer.isActive ? 'active' : 'inactive'}
                     </span>
                   </td>
                   <td className="p-4">

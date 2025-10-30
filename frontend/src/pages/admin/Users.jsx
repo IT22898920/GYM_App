@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../../utils/api";
 import {
   FiSearch,
   FiPlus,
@@ -26,6 +27,9 @@ function Users() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
 
   const stats = [
     {
@@ -66,51 +70,30 @@ function Users() {
     },
   ];
 
-  const users = [
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john@example.com",
-      role: "Gym Owner",
-      status: "active",
-      joinDate: "2024-02-15",
-      lastLogin: "2024-02-20 14:30",
-      avatar: "https://i.pravatar.cc/150?img=1",
-    },
-    {
-      id: 2,
-      name: "Sarah Smith",
-      email: "sarah@example.com",
-      role: "Customer",
-      status: "active",
-      joinDate: "2024-02-14",
-      lastLogin: "2024-02-20 12:15",
-      avatar: "https://i.pravatar.cc/150?img=2",
-    },
-    {
-      id: 3,
-      name: "Mike Johnson",
-      email: "mike@example.com",
-      role: "Receptionist",
-      status: "inactive",
-      joinDate: "2024-02-01",
-      lastLogin: "2024-02-10 09:45",
-      avatar: "https://i.pravatar.cc/150?img=3",
-    },
-    // Generate more sample data
-    ...Array.from({ length: 47 }, (_, i) => ({
-      id: i + 4,
-      name: `User ${i + 4}`,
-      email: `user${i + 4}@example.com`,
-      role: ["Gym Owner", "Customer", "Receptionist"][
-        Math.floor(Math.random() * 3)
-      ],
-      status: Math.random() > 0.2 ? "active" : "inactive",
-      joinDate: "2024-02-01",
-      lastLogin: "2024-02-20 10:00",
-      avatar: `https://i.pravatar.cc/150?img=${(i + 4) % 70}`,
-    })),
-  ];
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      try {
+        const params = {
+          page: currentPage,
+          limit: itemsPerPage,
+          role: selectedRole === 'all' ? 'all' : (selectedRole === 'Gym Owner' ? 'gymOwner' : selectedRole.toLowerCase()),
+          status: selectedStatus,
+          search: searchTerm
+        };
+        const res = await api.getUsersAdmin(params);
+        setUsers(res.data || []);
+        setTotalItems(res.pagination?.totalItems || 0);
+      } catch (e) {
+        setUsers([]);
+        setTotalItems(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, [currentPage, itemsPerPage, selectedRole, selectedStatus, searchTerm]);
 
   const roleOptions = [
     { value: "all", label: "All Roles" },
@@ -125,23 +108,20 @@ function Users() {
     { value: "inactive", label: "Inactive" },
   ];
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === "all" || user.role === selectedRole;
-    const matchesStatus =
-      selectedStatus === "all" || user.status === selectedStatus;
-
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  // Pagination calculations
-  const totalItems = filteredUsers.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentUsers = filteredUsers.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+
+  const roleLabel = (role) => {
+    switch (role) {
+      case 'gymOwner': return 'Gym Owner';
+      case 'customer': return 'Customer';
+      case 'instructor': return 'Instructor';
+      case 'admin': return 'Admin';
+      case 'receptionist': return 'Receptionist';
+      default: return role;
+    }
+  };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -288,21 +268,21 @@ function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {currentUsers.map((user) => (
+              {users.map((user) => (
                 <tr
-                  key={user.id}
+                  key={user._id}
                   className="hover:bg-gray-700/20 transition-colors"
                 >
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
                       <img
-                        src={user.avatar}
-                        alt={user.name}
+                        src={user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent((user.firstName||'')[0]||'U')}`}
+                        alt={user.firstName}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div>
                         <div className="font-medium text-white">
-                          {user.name}
+                          {user.firstName} {user.lastName}
                         </div>
                         <div className="text-sm text-gray-400">
                           {user.email}
@@ -313,34 +293,34 @@ function Users() {
                   <td className="p-4">
                     <span
                       className={`px-3 py-1 rounded-full text-sm ${
-                        user.role === "Gym Owner"
+                        roleLabel(user.role) === "Gym Owner"
                           ? "bg-violet-500/10 text-violet-400"
-                          : user.role === "Customer"
+                          : roleLabel(user.role) === "Customer"
                           ? "bg-blue-500/10 text-blue-400"
                           : "bg-green-500/10 text-green-400"
                       }`}
                     >
-                      {user.role}
+                      {roleLabel(user.role)}
                     </span>
                   </td>
                   <td className="p-4">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-                        user.status === "active"
+                        user.isActive
                           ? "bg-green-500/10 text-green-400"
                           : "bg-red-500/10 text-red-400"
                       }`}
                     >
-                      {user.status === "active" ? (
+                      {user.isActive ? (
                         <FiCheck className="w-4 h-4 mr-1" />
                       ) : (
                         <FiX className="w-4 h-4 mr-1" />
                       )}
-                      {user.status}
+                      {user.isActive ? 'active' : 'inactive'}
                     </span>
                   </td>
-                  <td className="p-4 text-gray-300">{user.joinDate}</td>
-                  <td className="p-4 text-gray-300">{user.lastLogin}</td>
+                  <td className="p-4 text-gray-300">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
+                  <td className="p-4 text-gray-300">-</td>
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
                       <button
