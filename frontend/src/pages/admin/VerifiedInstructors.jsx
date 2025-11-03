@@ -25,6 +25,7 @@ import { useAlert } from '../../contexts/AlertContext';
 function VerifiedInstructors() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("all");
+  const [selectedFreelancing, setSelectedFreelancing] = useState("all");
   const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -39,7 +40,7 @@ function VerifiedInstructors() {
   // Load instructors on component mount
   useEffect(() => {
     fetchInstructors();
-  }, [selectedSpecialization, searchTerm]);
+  }, [selectedSpecialization, selectedFreelancing, searchTerm]);
 
   const fetchInstructors = async () => {
     try {
@@ -52,7 +53,22 @@ function VerifiedInstructors() {
         params.search = searchTerm;
       }
       const response = await api.getVerifiedInstructors(params);
-      setInstructors(response.data || []);
+      let filteredData = response.data || [];
+      
+      // Filter by freelancing status on frontend
+      if (selectedFreelancing !== 'all') {
+        filteredData = filteredData.filter(instructor => {
+          const isFreelance = instructor.application?.isFreelance || false;
+          if (selectedFreelancing === 'freelancing') {
+            return isFreelance === true;
+          } else if (selectedFreelancing === 'non-freelancing') {
+            return isFreelance === false;
+          }
+          return true;
+        });
+      }
+      
+      setInstructors(filteredData);
     } catch (error) {
       console.error('Error fetching instructors:', error);
       showAlert('Failed to fetch verified instructors', 'error');
@@ -179,7 +195,7 @@ function VerifiedInstructors() {
               />
             </div>
           </div>
-          <div>
+          <div className="flex gap-4">
             <select
               value={selectedSpecialization}
               onChange={(e) => setSelectedSpecialization(e.target.value)}
@@ -190,6 +206,15 @@ function VerifiedInstructors() {
                   {spec}
                 </option>
               ))}
+            </select>
+            <select
+              value={selectedFreelancing}
+              onChange={(e) => setSelectedFreelancing(e.target.value)}
+              className="w-full md:w-48 bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+            >
+              <option value="all">All Types</option>
+              <option value="freelancing">Freelancing</option>
+              <option value="non-freelancing">Non-Freelancing</option>
             </select>
           </div>
         </div>
