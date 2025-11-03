@@ -28,11 +28,11 @@ function GymRequests() {
 
 
 
-  // Fetch collaboration requests (received from gyms)
+  // Fetch collaboration requests (received from gyms) - only pending requests
   const fetchCollabRequests = async () => {
     try {
       console.log('🔄 Starting to fetch collaboration requests...');
-      const response = await api.getInstructorCollaborationRequests();
+      const response = await api.getInstructorCollaborationRequests('pending');
       console.log('📨 Collaboration Requests API Response:', response);
       if (response.success) {
         console.log('📨 Setting collaboration requests:', response.data?.length, 'requests');

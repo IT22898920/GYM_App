@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   FiSearch,
   FiFilter,
@@ -15,6 +16,7 @@ import {
   FiGlobe,
   FiInstagram,
   FiMessageSquare,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { useAlert } from "../../contexts/AlertContext";
 import api from "../../utils/api";
@@ -29,29 +31,78 @@ function VerifyRejectGym() {
   const [collaborationRequests, setCollaborationRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showAlert } = useAlert();
+  const location = useLocation();
 
-  // Fetch collaboration requests
+  // Fetch collaboration requests - only accepted/rejected requests (exclude pending)
   useEffect(() => {
-    const fetchRequests = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const status = selectedFilter === "all" ? null : selectedFilter;
-        const response = await api.getInstructorCollaborationRequests(status);
-        if (response.success) {
-          setCollaborationRequests(response.data || []);
+        // Fetch all requests and filter out pending ones
+        const response = await api.getInstructorCollaborationRequests(null);
+        if (response && response.success) {
+          let filteredData = response.data || [];
+          
+          // Filter out pending requests - only show accepted and rejected
+          filteredData = filteredData.filter(request => 
+            request && (request.status === 'accepted' || request.status === 'rejected')
+          );
+          
+          // Apply status filter if not "all"
+          if (selectedFilter !== "all") {
+            filteredData = filteredData.filter(request => 
+              request && request.status === selectedFilter
+            );
+          }
+          
+          setCollaborationRequests(filteredData);
         } else {
           showAlert('Failed to fetch collaboration requests', 'error');
+          setCollaborationRequests([]);
         }
       } catch (error) {
         console.error('Error fetching collaboration requests:', error);
         showAlert('Error fetching collaboration requests', 'error');
+        setCollaborationRequests([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRequests();
-  }, [selectedFilter, showAlert]);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFilter, location.pathname]);
+
+  // Separate function for manual refresh
+  const refreshRequests = async () => {
+    try {
+      setLoading(true);
+      const response = await api.getInstructorCollaborationRequests(null);
+      if (response && response.success) {
+        let filteredData = response.data || [];
+        
+        filteredData = filteredData.filter(request => 
+          request && (request.status === 'accepted' || request.status === 'rejected')
+        );
+        
+        if (selectedFilter !== "all") {
+          filteredData = filteredData.filter(request => 
+            request && request.status === selectedFilter
+          );
+        }
+        
+        setCollaborationRequests(filteredData);
+      } else {
+        showAlert('Failed to fetch collaboration requests', 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching collaboration requests:', error);
+      showAlert('Error fetching collaboration requests', 'error');
+      setCollaborationRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleApprove = async (requestId) => {
     try {
@@ -61,11 +112,7 @@ function VerifyRejectGym() {
       if (response.success) {
         showAlert('Request approved successfully!', 'success');
         // Refresh the list
-        const status = selectedFilter === "all" ? null : selectedFilter;
-        const refreshResponse = await api.getInstructorCollaborationRequests(status);
-        if (refreshResponse.success) {
-          setCollaborationRequests(refreshResponse.data || []);
-        }
+        await refreshRequests();
       } else {
         showAlert(response.message || 'Failed to approve request', 'error');
       }
@@ -99,11 +146,7 @@ function VerifyRejectGym() {
         setSelectedRequest(null);
         
         // Refresh the list
-        const status = selectedFilter === "all" ? null : selectedFilter;
-        const refreshResponse = await api.getInstructorCollaborationRequests(status);
-        if (refreshResponse.success) {
-          setCollaborationRequests(refreshResponse.data || []);
-        }
+        await refreshRequests();
       } else {
         showAlert(response.message || 'Failed to reject request', 'error');
       }
@@ -115,19 +158,29 @@ function VerifyRejectGym() {
     }
   };
 
-  const filteredRequests = collaborationRequests.filter((request) => {
-    const gymName = request.gym?.gymName || '';
-    const gymAddress = request.gym?.address?.street || request.gym?.gymAddress || '';
-    const location = `${gymAddress}`.toLowerCase();
-    
-    const matchesSearch =
-      gymName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      location.includes(searchTerm.toLowerCase());
-    
-    const matchesFilter =
-      selectedFilter === "all" || request.status === selectedFilter;
-    
-    return matchesSearch && matchesFilter;
+  const filteredRequests = (collaborationRequests || []).filter((request) => {
+    try {
+      if (!request) return false;
+      
+      const gymName = (request.gym && request.gym.gymName) || '';
+      const gymAddress = (request.gym && request.gym.address && request.gym.address.street) || 
+                         (request.gym && request.gym.gymAddress) || '';
+      const location = `${gymAddress}`.toLowerCase();
+      
+      const matchesSearch =
+        gymName.toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+        location.includes((searchTerm || '').toLowerCase());
+      
+      // Status filter is already applied in useEffect, but keep for safety
+      const matchesFilter =
+        selectedFilter === "all" || request.status === selectedFilter;
+      
+      // Ensure pending requests are never shown here
+      return matchesSearch && matchesFilter && request.status !== 'pending';
+    } catch (error) {
+      console.error('Error filtering request:', error);
+      return false;
+    }
   });
 
   return (
@@ -142,6 +195,14 @@ function VerifyRejectGym() {
             Review and manage gym join requests
           </p>
         </div>
+        <button
+          onClick={refreshRequests}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-violet-500/10 text-violet-400 rounded-lg hover:bg-violet-500/20 transition-colors disabled:opacity-50"
+        >
+          <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {/* Filters */}
@@ -166,8 +227,7 @@ function VerifyRejectGym() {
               className="bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
             >
               <option value="all">All Requests</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
+              <option value="accepted">Accepted</option>
               <option value="rejected">Rejected</option>
             </select>
             <button className="flex items-center gap-2 px-4 py-3 bg-gray-900/50 text-gray-400 rounded-lg hover:text-white transition-colors">
@@ -213,6 +273,10 @@ function VerifyRejectGym() {
             const gymEmail = contactInfo.email || gymOwner.email || 'N/A';
             const gymPhone = contactInfo.phone || 'N/A';
             const gymWebsite = contactInfo.website || '';
+            // Handle rating - can be object {average, totalReviews} or number
+            const gymRating = gym.rating 
+              ? (typeof gym.rating === 'object' ? gym.rating.average : gym.rating)
+              : null;
 
             return (
               <div
@@ -237,11 +301,11 @@ function VerifyRejectGym() {
                         {gymName}
                       </h3>
                       <div className="flex items-center space-x-4">
-                        {gym.rating && (
+                        {gymRating && (
                           <>
                             <div className="flex items-center">
                               <FiStar className="w-4 h-4 text-yellow-400 mr-1" />
-                              <span className="text-white">{gym.rating}</span>
+                              <span className="text-white">{gymRating}</span>
                             </div>
                             <span className="text-gray-400">•</span>
                           </>
