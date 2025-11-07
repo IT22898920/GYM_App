@@ -27,6 +27,7 @@ import Users from "./pages/admin/Users";
 import GymOwners from "./pages/admin/GymOwners";
 import Customers from "./pages/admin/Customers";
 import Receptionists from "./pages/admin/Receptionists";
+import AddReceptionist from "./pages/admin/AddReceptionist";
 import FindGym from "./pages/FindGym";
 import ClassSchedule from "./pages/ClassSchedule";
 import BookingConfirmation from "./pages/BookingConfirmation";
@@ -128,6 +129,7 @@ function AppContent() {
           <Route path="users/gym-owners" element={<GymOwners />} />
           <Route path="users/customers" element={<Customers />} />
           <Route path="users/receptionists" element={<Receptionists />} />
+          <Route path="users/receptionists/add" element={<AddReceptionist />} />
           <Route path="profile" element={<Profile />} />
           <Route path="payments" element={<Pricing />} />
           <Route path="finance" element={<FinanceAdmin />} />
