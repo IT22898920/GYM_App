@@ -13,6 +13,7 @@ import {
   FiCheck,
   FiX,
   FiLoader,
+  FiMessageSquare,
 } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import api from "../../utils/api";
@@ -278,6 +279,18 @@ function WorkoutPlans() {
                         >
                           <FiActivity className="w-5 h-5" />
                         </button>
+                        {/* Show note indicator if any plan has member notes */}
+                        {/* {student.plans.some(plan => 
+                          plan.schedule.some(day => 
+                            day.exercises.some(exercise => 
+                              exercise.memberNotes && exercise.memberNotes.length > 0
+                            )
+                          )
+                        ) && (
+                          <div className="p-2 text-blue-400" title="Has member notes">
+                            <FiMessageSquare className="w-5 h-5" />
+                          </div>
+                        )} */}
                         <button
                           className="p-2 text-gray-400 hover:text-white transition-colors"
                           title="Edit"
@@ -418,6 +431,26 @@ function WorkoutPlans() {
                                       ` for ${exercise.duration}`}
                                     {exercise.notes && ` - ${exercise.notes}`}
                                   </div>
+                                  
+                                  {/* Display member notes */}
+                                  {exercise.memberNotes && exercise.memberNotes.length > 0 && (
+                                    <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <FiMessageSquare className="w-3 h-3 text-blue-400" />
+                                        <span className="text-xs font-medium text-blue-400">Member Notes:</span>
+                                      </div>
+                                      <div className="space-y-1">
+                                        {exercise.memberNotes.map((note, noteIndex) => (
+                                          <div key={noteIndex} className="text-xs text-gray-300 bg-gray-800/50 p-1.5 rounded">
+                                            <p>"{note.note}"</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                              {new Date(note.createdAt).toLocaleString()}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className={`px-2 py-1 rounded-full text-xs ${

@@ -12,6 +12,9 @@ import {
   FiTrendingUp,
   FiChevronDown,
   FiChevronUp,
+  FiMessageSquare,
+  FiPlus,
+  FiTrash2,
 } from "react-icons/fi";
 import api from "../utils/api";
 
@@ -33,6 +36,11 @@ function ViewMyWorkout() {
   // Confirmation Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [exerciseToComplete, setExerciseToComplete] = useState(null);
+
+  // Note Modal states
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [exerciseToNote, setExerciseToNote] = useState(null);
+  const [noteText, setNoteText] = useState('');
 
   // Fetch workout plans from backend
   useEffect(() => {
@@ -337,6 +345,166 @@ function ViewMyWorkout() {
   const cancelExerciseCompletion = () => {
     setShowConfirmModal(false);
     setExerciseToComplete(null);
+  };
+
+  // Handle note button click
+  const handleNoteClick = (planId, dayIndex, exerciseIndex) => {
+    const currentPlan = workoutPlans.find(plan => plan.id === planId);
+    if (!currentPlan) {
+      console.error('Plan not found:', planId);
+      return;
+    }
+    
+    const currentExercise = currentPlan.schedule[dayIndex].exercises[exerciseIndex];
+    if (!currentExercise) {
+      console.error('Exercise not found:', { dayIndex, exerciseIndex });
+      return;
+    }
+    
+    // Check if exercise is completed
+    if (currentExercise.workoutStatus === 1) {
+      alert('Cannot add notes to completed exercises. Please add notes before marking the exercise as complete.');
+      return;
+    }
+    
+    setExerciseToNote({
+      planId,
+      dayIndex,
+      exerciseIndex,
+      exerciseName: currentExercise.name,
+      planName: currentPlan.name
+    });
+    setNoteText('');
+    setShowNoteModal(true);
+  };
+
+  // Add note to exercise
+  const addNoteToExercise = async () => {
+    if (!exerciseToNote || !noteText.trim()) return;
+
+    try {
+      const { planId, dayIndex, exerciseIndex } = exerciseToNote;
+      
+      console.log('Adding note to exercise:', { planId, dayIndex, exerciseIndex, note: noteText });
+
+      // Call API to add note
+      const response = await api.addMemberNote(planId, dayIndex, exerciseIndex, noteText.trim());
+      
+      if (response.success) {
+        console.log('Note added successfully:', response);
+        
+        // Update local state to show the note
+        setWorkoutPlans((prev) =>
+          prev.map((plan) => {
+            if (plan.id === planId) {
+              const updatedSchedule = plan.schedule.map((day, dIndex) => {
+                if (dIndex === dayIndex) {
+                  return {
+                    ...day,
+                    exercises: day.exercises.map((exercise, eIndex) => {
+                      if (eIndex === exerciseIndex) {
+                        return {
+                          ...exercise,
+                          memberNotes: exercise.memberNotes ? 
+                            [...exercise.memberNotes, { note: noteText.trim(), createdAt: new Date() }] :
+                            [{ note: noteText.trim(), createdAt: new Date() }]
+                        };
+                      }
+                      return exercise;
+                    }),
+                  };
+                }
+                return day;
+              });
+
+              return {
+                ...plan,
+                schedule: updatedSchedule
+              };
+            }
+            return plan;
+          })
+        );
+
+        console.log(`✅ Note added to "${exerciseToNote.exerciseName}"`);
+        alert(`Note added successfully to "${exerciseToNote.exerciseName}"!`);
+      } else {
+        console.error('Failed to add note:', response.message);
+        alert(response.message || 'Failed to add note. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error adding note:', error);
+      alert('Error adding note. Please try again.');
+    } finally {
+      // Close modal and reset state
+      setShowNoteModal(false);
+      setExerciseToNote(null);
+      setNoteText('');
+    }
+  };
+
+  const cancelNoteAddition = () => {
+    setShowNoteModal(false);
+    setExerciseToNote(null);
+    setNoteText('');
+  };
+
+  // Delete note from exercise
+  const deleteNoteFromExercise = async (planId, dayIndex, exerciseIndex, noteIndex) => {
+    if (!window.confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      console.log('Deleting note:', { planId, dayIndex, exerciseIndex, noteIndex });
+
+      // Call API to delete note
+      const response = await api.deleteMemberNote(planId, dayIndex, exerciseIndex, noteIndex);
+      
+      if (response.success) {
+        console.log('Note deleted successfully:', response);
+        
+        // Update local state to remove the note
+        setWorkoutPlans((prev) =>
+          prev.map((plan) => {
+            if (plan.id === planId) {
+              const updatedSchedule = plan.schedule.map((day, dIndex) => {
+                if (dIndex === dayIndex) {
+                  return {
+                    ...day,
+                    exercises: day.exercises.map((exercise, eIndex) => {
+                      if (eIndex === exerciseIndex) {
+                        return {
+                          ...exercise,
+                          memberNotes: exercise.memberNotes.filter((_, index) => index !== noteIndex)
+                        };
+                      }
+                      return exercise;
+                    }),
+                  };
+                }
+                return day;
+              });
+
+              return {
+                ...plan,
+                schedule: updatedSchedule
+              };
+            }
+            return plan;
+          })
+        );
+
+        console.log(`✅ Note deleted successfully`);
+        alert('Note deleted successfully!');
+      } else {
+        console.error('Failed to delete note:', response.message);
+        alert(response.message || 'Failed to delete note. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      alert('Error deleting note. Please try again.');
+    }
   };
 
   const getStatusColor = (status) => {
@@ -660,41 +828,61 @@ function ViewMyWorkout() {
                                                 🎬 View Demo
                                               </span>
                                             </h4>
-                                            <button
-                                              onClick={() => {
-                                                console.log('Button clicked!', {
-                                                  planId: plan.id,
-                                                  dayIndex,
-                                                  exerciseIndex,
-                                                  exercise: exercise,
-                                                  currentStatus: exercise.workoutStatus
-                                                });
-                                                handleMarkCompleteClick(
-                                                  plan.id,
-                                                  dayIndex,
-                                                  exerciseIndex
-                                                );
-                                              }}
-                                              disabled={exercise.workoutStatus === 1}
-                                              className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 ${
-                                                exercise.workoutStatus === 1
-                                                  ? "bg-green-500/20 text-green-400 cursor-not-allowed opacity-75"
-                                                  : "bg-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-white"
-                                              } transition-colors`}
-                                              title={exercise.workoutStatus === 1 ? "Exercise completed - cannot be changed" : "Click to mark as complete"}
-                                            >
-                                              {exercise.workoutStatus === 1 ? (
-                                                <>
-                                                  <FiCheck className="w-4 h-4" />
-                                                  <span> Completed</span>
-                                                </>
-                                              ) : (
-                                                <>
-                                                  <FiX className="w-4 h-4" />
-                                                  <span>Mark Complete</span>
-                                                </>
-                                              )}
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                onClick={() => handleNoteClick(plan.id, dayIndex, exerciseIndex)}
+                                                disabled={exercise.workoutStatus === 1}
+                                                className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 transition-colors ${
+                                                  exercise.workoutStatus === 1
+                                                    ? "bg-gray-500/20 text-gray-500 cursor-not-allowed opacity-75"
+                                                    : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300"
+                                                }`}
+                                                title={exercise.workoutStatus === 1 ? "Cannot add notes to completed exercises" : "Add a note to this exercise"}
+                                              >
+                                                <FiMessageSquare className="w-4 h-4" />
+                                                <span>Note</span>
+                                                {exercise.memberNotes && exercise.memberNotes.length > 0 && (
+                                                  <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                                    {exercise.memberNotes.length}
+                                                  </span>
+                                                )}
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  console.log('Button clicked!', {
+                                                    planId: plan.id,
+                                                    dayIndex,
+                                                    exerciseIndex,
+                                                    exercise: exercise,
+                                                    currentStatus: exercise.workoutStatus
+                                                  });
+                                                  handleMarkCompleteClick(
+                                                    plan.id,
+                                                    dayIndex,
+                                                    exerciseIndex
+                                                  );
+                                                }}
+                                                disabled={exercise.workoutStatus === 1}
+                                                className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 ${
+                                                  exercise.workoutStatus === 1
+                                                    ? "bg-green-500/20 text-green-400 cursor-not-allowed opacity-75"
+                                                    : "bg-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-white"
+                                                } transition-colors`}
+                                                title={exercise.workoutStatus === 1 ? "Exercise completed - cannot be changed" : "Click to mark as complete"}
+                                              >
+                                                {exercise.workoutStatus === 1 ? (
+                                                  <>
+                                                    <FiCheck className="w-4 h-4" />
+                                                    <span> Completed</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <FiX className="w-4 h-4" />
+                                                    <span>Mark Complete</span>
+                                                  </>
+                                                )}
+                                              </button>
+                                            </div>
                                           </div>
                                           <div className="flex items-center gap-6 text-gray-400">
                                             {exercise.sets && (
@@ -715,6 +903,37 @@ function ViewMyWorkout() {
                                               </span>
                                             )}
                                           </div>
+                                          
+                                          {/* Display existing notes */}
+                                          {exercise.memberNotes && exercise.memberNotes.length > 0 && (
+                                            <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <FiMessageSquare className="w-4 h-4 text-blue-400" />
+                                                <span className="text-sm font-medium text-blue-400">Your Notes:</span>
+                                              </div>
+                                              <div className="space-y-2">
+                                                {exercise.memberNotes.map((note, noteIndex) => (
+                                                  <div key={noteIndex} className="text-sm text-gray-300 bg-gray-800/50 p-2 rounded group">
+                                                    <div className="flex items-start justify-between">
+                                                      <div className="flex-1">
+                                                        <p>{note.note}</p>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                          {new Date(note.createdAt).toLocaleString()}
+                                                        </p>
+                                                      </div>
+                                                      <button
+                                                        onClick={() => deleteNoteFromExercise(plan.id, dayIndex, exerciseIndex, noteIndex)}
+                                                        className="ml-2 p-1 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                                                        title="Delete this note"
+                                                      >
+                                                        <FiTrash2 className="w-3 h-3" />
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     )
@@ -903,6 +1122,77 @@ function ViewMyWorkout() {
               >
                 <FiCheck className="w-4 h-4" />
                 Mark Complete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Note Modal */}
+      {showNoteModal && exerciseToNote && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
+          onClick={cancelNoteAddition}
+        >
+          <div 
+            className="bg-gray-800 rounded-2xl max-w-md w-full border-2 border-blue-500/50 shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">📝</span>
+                <div>
+                  <h3 className="text-2xl font-bold text-white">
+                    Add Note
+                  </h3>
+                  <p className="text-blue-200 text-sm">Share your thoughts about this exercise</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-white mb-2">
+                  "{exerciseToNote.exerciseName}"
+                </h4>
+                <p className="text-gray-400 text-sm mb-4">
+                  Add a note about your experience with this exercise. Your instructor will be able to see this.
+                </p>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
+                  <p className="text-yellow-200 text-sm">
+                    <strong>💡 Tip:</strong> Add your notes before marking the exercise as complete. Once completed, you won't be able to add new notes.
+                  </p>
+                </div>
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Enter your note here... (e.g., 'Felt easier today', 'Need to increase weight', 'Great form!')"
+                  className="w-full h-32 bg-gray-900/50 text-white rounded-lg p-4 border border-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none resize-none"
+                  maxLength={500}
+                />
+                <div className="text-right text-xs text-gray-500 mt-1">
+                  {noteText.length}/500 characters
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-900/50 p-6 rounded-b-2xl flex justify-end gap-3">
+              <button
+                onClick={cancelNoteAddition}
+                className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addNoteToExercise}
+                disabled={!noteText.trim()}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <FiPlus className="w-4 h-4" />
+                Add Note
               </button>
             </div>
           </div>

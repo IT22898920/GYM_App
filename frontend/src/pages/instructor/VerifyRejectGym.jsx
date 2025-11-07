@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   FiSearch,
   FiFilter,
@@ -15,116 +16,171 @@ import {
   FiGlobe,
   FiInstagram,
   FiMessageSquare,
+  FiRefreshCw,
 } from "react-icons/fi";
+import { useAlert } from "../../contexts/AlertContext";
+import api from "../../utils/api";
 
 function VerifyRejectGym() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [selectedGym, setSelectedGym] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [collaborationRequests, setCollaborationRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { showAlert } = useAlert();
+  const location = useLocation();
 
-  // Sample data for gym requests
-  const gymRequests = [
-    {
-      id: 1,
-      name: "FitZone Elite",
-      email: "info@fitzone.com",
-      phone: "(555) 123-4567",
-      location: "123 Fitness Street, San Francisco, CA",
-      description:
-        "Premier fitness facility with state-of-the-art equipment and expert trainers.",
-      memberCount: "500+",
-      instructorCount: 24,
-      facilities: [
-        "Cardio Equipment",
-        "Weight Training",
-        "Personal Training",
-        "Yoga Studio",
-      ],
-      classes: ["Morning Yoga", "HIIT", "Strength Training"],
-      rating: 4.8,
-      reviews: 245,
-      requestDate: "2024-03-01",
-      proposedSalary: "$45-60/hr",
-      benefits: [
-        "Health Insurance",
-        "401k",
-        "Flexible Schedule",
-        "Professional Development",
-      ],
-      image:
-        "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80",
-      website: "https://fitzone.com",
-      social: {
-        instagram: "fitzone",
-      },
-      message:
-        "We would love to have you join our team of expert trainers. Your expertise in yoga would be a perfect fit for our morning and evening classes.",
-      status: "pending",
-    },
-    {
-      id: 2,
-      name: "PowerFlex Gym",
-      email: "info@powerflex.com",
-      phone: "(555) 234-5678",
-      location: "456 Strength Ave, Los Angeles, CA",
-      description:
-        "Specialized strength and conditioning facility focused on performance.",
-      memberCount: "350+",
-      instructorCount: 18,
-      facilities: ["CrossFit", "Olympic Lifting", "Group Classes", "Spa"],
-      classes: ["CrossFit WOD", "Powerlifting", "Olympic Lifting"],
-      rating: 4.6,
-      reviews: 189,
-      requestDate: "2024-03-02",
-      proposedSalary: "$50-70/hr",
-      benefits: [
-        "Performance Bonuses",
-        "Equipment Allowance",
-        "Continuing Education",
-      ],
-      image:
-        "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&q=80",
-      website: "https://powerflex.com",
-      social: {
-        instagram: "powerflex",
-      },
-      message:
-        "Your strength training background aligns perfectly with our facility's focus. We offer competitive compensation and opportunities for growth.",
-      status: "pending",
-    },
-  ];
+  // Fetch collaboration requests - only accepted/rejected requests (exclude pending)
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        // Fetch all requests and filter out pending ones
+        const response = await api.getInstructorCollaborationRequests(null);
+        if (response && response.success) {
+          let filteredData = response.data || [];
+          
+          // Filter out pending requests - only show accepted and rejected
+          filteredData = filteredData.filter(request => 
+            request && (request.status === 'accepted' || request.status === 'rejected')
+          );
+          
+          // Apply status filter if not "all"
+          if (selectedFilter !== "all") {
+            filteredData = filteredData.filter(request => 
+              request && request.status === selectedFilter
+            );
+          }
+          
+          setCollaborationRequests(filteredData);
+        } else {
+          showAlert('Failed to fetch collaboration requests', 'error');
+          setCollaborationRequests([]);
+        }
+      } catch (error) {
+        console.error('Error fetching collaboration requests:', error);
+        showAlert('Error fetching collaboration requests', 'error');
+        setCollaborationRequests([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleApprove = async (gymId) => {
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    console.log("Approving gym:", gymId);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFilter, location.pathname]);
+
+  // Separate function for manual refresh
+  const refreshRequests = async () => {
+    try {
+      setLoading(true);
+      const response = await api.getInstructorCollaborationRequests(null);
+      if (response && response.success) {
+        let filteredData = response.data || [];
+        
+        filteredData = filteredData.filter(request => 
+          request && (request.status === 'accepted' || request.status === 'rejected')
+        );
+        
+        if (selectedFilter !== "all") {
+          filteredData = filteredData.filter(request => 
+            request && request.status === selectedFilter
+          );
+        }
+        
+        setCollaborationRequests(filteredData);
+      } else {
+        showAlert('Failed to fetch collaboration requests', 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching collaboration requests:', error);
+      showAlert('Error fetching collaboration requests', 'error');
+      setCollaborationRequests([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReject = async (gymId) => {
-    if (!rejectReason.trim()) return;
-
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setShowRejectModal(false);
-    setRejectReason("");
-    setSelectedGym(null);
-    console.log("Rejecting gym:", gymId, "Reason:", rejectReason);
+  const handleApprove = async (requestId) => {
+    try {
+      setIsSubmitting(true);
+      const response = await api.respondToCollaborationRequest(requestId, 'accept');
+      
+      if (response.success) {
+        showAlert('Request approved successfully!', 'success');
+        // Refresh the list
+        await refreshRequests();
+      } else {
+        showAlert(response.message || 'Failed to approve request', 'error');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      showAlert(error.message || 'Failed to approve request', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const filteredRequests = gymRequests.filter((gym) => {
-    const matchesSearch =
-      gym.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      gym.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter =
-      selectedFilter === "all" || gym.status === selectedFilter;
-    return matchesSearch && matchesFilter;
+  const handleReject = async () => {
+    if (!selectedRequest) return;
+    if (!rejectReason.trim()) {
+      showAlert('Please provide a reason for rejection', 'error');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await api.respondToCollaborationRequest(
+        selectedRequest._id, 
+        'reject', 
+        rejectReason
+      );
+      
+      if (response.success) {
+        showAlert('Request rejected successfully', 'success');
+        setShowRejectModal(false);
+        setRejectReason("");
+        setSelectedRequest(null);
+        
+        // Refresh the list
+        await refreshRequests();
+      } else {
+        showAlert(response.message || 'Failed to reject request', 'error');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      showAlert(error.message || 'Failed to reject request', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const filteredRequests = (collaborationRequests || []).filter((request) => {
+    try {
+      if (!request) return false;
+      
+      const gymName = (request.gym && request.gym.gymName) || '';
+      const gymAddress = (request.gym && request.gym.address && request.gym.address.street) || 
+                         (request.gym && request.gym.gymAddress) || '';
+      const location = `${gymAddress}`.toLowerCase();
+      
+      const matchesSearch =
+        gymName.toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+        location.includes((searchTerm || '').toLowerCase());
+      
+      // Status filter is already applied in useEffect, but keep for safety
+      const matchesFilter =
+        selectedFilter === "all" || request.status === selectedFilter;
+      
+      // Ensure pending requests are never shown here
+      return matchesSearch && matchesFilter && request.status !== 'pending';
+    } catch (error) {
+      console.error('Error filtering request:', error);
+      return false;
+    }
   });
 
   return (
@@ -139,6 +195,14 @@ function VerifyRejectGym() {
             Review and manage gym join requests
           </p>
         </div>
+        <button
+          onClick={refreshRequests}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-violet-500/10 text-violet-400 rounded-lg hover:bg-violet-500/20 transition-colors disabled:opacity-50"
+        >
+          <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {/* Filters */}
@@ -163,8 +227,7 @@ function VerifyRejectGym() {
               className="bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
             >
               <option value="all">All Requests</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
+              <option value="accepted">Accepted</option>
               <option value="rejected">Rejected</option>
             </select>
             <button className="flex items-center gap-2 px-4 py-3 bg-gray-900/50 text-gray-400 rounded-lg hover:text-white transition-colors">
@@ -176,217 +239,263 @@ function VerifyRejectGym() {
       </div>
 
       {/* Gym Requests */}
-      <div className="space-y-6">
-        {filteredRequests.map((gym) => (
-          <div
-            key={gym.id}
-            className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50"
-          >
-            {/* Header */}
-            <div className="flex justify-between items-start">
-              <div className="flex items-start space-x-4">
-                <div className="h-16 w-16 rounded-xl overflow-hidden">
-                  <img
-                    src={gym.image}
-                    alt={gym.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-white mb-2">
-                    {gym.name}
-                  </h3>
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-violet-600 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading collaboration requests...</p>
+          </div>
+        </div>
+      ) : filteredRequests.length === 0 ? (
+        <div className="text-center py-16 bg-gray-800/20 rounded-2xl border border-gray-700/30">
+          <FiMessageSquare className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-300 mb-2">No requests found</h3>
+          <p className="text-gray-400">
+            {selectedFilter === "all" 
+              ? "You haven't received any collaboration requests from gym owners yet." 
+              : `No ${selectedFilter} requests found.`}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filteredRequests.map((request) => {
+            const gym = request.gym || {};
+            const gymOwner = request.fromGymOwner || {};
+            const gymName = gym.gymName || 'Unknown Gym';
+            const gymImage = gym.logo?.url || gym.images?.[0]?.url || `https://ui-avatars.com/api/?name=${encodeURIComponent(gymName)}&background=8b5cf6&color=fff&size=300`;
+            const gymAddress = gym.address?.street || gym.gymAddress?.street || gym.gymAddress || 'Address not available';
+            const gymCity = gym.address?.city || gym.gymAddress?.city || '';
+            const fullAddress = `${gymAddress}${gymCity ? ', ' + gymCity : ''}`;
+            const facilities = gym.facilities || gym.amenities || [];
+            const memberCount = gym.memberCount || 0;
+            const instructorCount = gym.instructors?.length || 0;
+            const contactInfo = gym.contactInfo || {};
+            const gymEmail = contactInfo.email || gymOwner.email || 'N/A';
+            const gymPhone = contactInfo.phone || 'N/A';
+            const gymWebsite = contactInfo.website || '';
+            // Handle rating - can be object {average, totalReviews} or number
+            const gymRating = gym.rating 
+              ? (typeof gym.rating === 'object' ? gym.rating.average : gym.rating)
+              : null;
+
+            return (
+              <div
+                key={request._id}
+                className="bg-gray-800/40 backdrop-blur-xl rounded-xl p-6 border border-gray-700/50"
+              >
+                {/* Header */}
+                <div className="flex justify-between items-start">
+                  <div className="flex items-start space-x-4">
+                    <div className="h-16 w-16 rounded-xl overflow-hidden bg-gray-700">
+                      <img
+                        src={gymImage}
+                        alt={gymName}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(gymName)}&background=8b5cf6&color=fff&size=300`;
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-white mb-2">
+                        {gymName}
+                      </h3>
+                      <div className="flex items-center space-x-4">
+                        {gymRating && (
+                          <>
+                            <div className="flex items-center">
+                              <FiStar className="w-4 h-4 text-yellow-400 mr-1" />
+                              <span className="text-white">{gymRating}</span>
+                            </div>
+                            <span className="text-gray-400">•</span>
+                          </>
+                        )}
+                        <div className="flex items-center text-gray-400">
+                          <FiMapPin className="w-4 h-4 mr-1" />
+                          {fullAddress}
+                        </div>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-400">
+                        Request from: {gymOwner.firstName} {gymOwner.lastName}
+                      </div>
+                    </div>
+                  </div>
                   <div className="flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <FiStar className="w-4 h-4 text-yellow-400 mr-1" />
-                      <span className="text-white">{gym.rating}</span>
-                      <span className="text-gray-400 text-sm ml-1">
-                        ({gym.reviews} reviews)
+                    {request.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleApprove(request._id)}
+                          disabled={isSubmitting}
+                          className="px-4 py-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Approve Request"
+                        >
+                          <FiCheck className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            setShowRejectModal(true);
+                          }}
+                          disabled={isSubmitting}
+                          className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Reject Request"
+                        >
+                          <FiX className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                    {request.status === 'accepted' && (
+                      <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium">
+                        Accepted
+                      </span>
+                    )}
+                    {request.status === 'rejected' && (
+                      <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium">
+                        Rejected
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                  <div className="p-4 bg-gray-900/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <FiUsers className="w-5 h-5 text-violet-400" />
+                      <span className="text-xl font-bold text-white">
+                        {memberCount}
                       </span>
                     </div>
-                    <span className="text-gray-400">•</span>
-                    <div className="flex items-center text-gray-400">
-                      <FiMapPin className="w-4 h-4 mr-1" />
-                      {gym.location}
+                    <span className="text-sm text-gray-400">Members</span>
+                  </div>
+                  <div className="p-4 bg-gray-900/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <FiActivity className="w-5 h-5 text-violet-400" />
+                      <span className="text-xl font-bold text-white">
+                        {instructorCount}
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-400">Instructors</span>
+                  </div>
+                  <div className="p-4 bg-gray-900/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <FiMail className="w-5 h-5 text-violet-400" />
+                      <span className="text-sm font-bold text-white truncate">
+                        {gymOwner.email}
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-400">Gym Owner</span>
+                  </div>
+                  <div className="p-4 bg-gray-900/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <FiClock className="w-5 h-5 text-violet-400" />
+                      <span className="text-sm font-bold text-white">
+                        {new Date(request.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-400">Request Date</span>
+                  </div>
+                </div>
+
+                {/* Description & Message */}
+                <div className="mt-6 space-y-4">
+                  {gym.description && (
+                    <div>
+                      <h4 className="text-white font-medium mb-2">About the Gym</h4>
+                      <p className="text-gray-400">{gym.description}</p>
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="text-white font-medium mb-2">Message from Gym Owner</h4>
+                    <div className="p-4 bg-gray-900/50 rounded-lg">
+                      <div className="flex items-center mb-2">
+                        <FiMessageSquare className="w-4 h-4 text-violet-400 mr-2" />
+                        <span className="text-gray-400">
+                          From {gymOwner.firstName} {gymOwner.lastName}
+                        </span>
+                      </div>
+                      <p className="text-gray-300">{request.message || 'No message provided'}</p>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => handleApprove(gym.id)}
-                  className="px-4 py-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition-colors"
-                >
-                  <FiCheck className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedGym(gym);
-                    setShowRejectModal(true);
-                  }}
-                  className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
-                >
-                  <FiX className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <div className="p-4 bg-gray-900/50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <FiUsers className="w-5 h-5 text-violet-400" />
-                  <span className="text-xl font-bold text-white">
-                    {gym.memberCount}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-400">Members</span>
-              </div>
-              <div className="p-4 bg-gray-900/50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <FiActivity className="w-5 h-5 text-violet-400" />
-                  <span className="text-xl font-bold text-white">
-                    {gym.instructorCount}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-400">Instructors</span>
-              </div>
-              <div className="p-4 bg-gray-900/50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <FiDollarSign className="w-5 h-5 text-violet-400" />
-                  <span className="text-xl font-bold text-white">
-                    {gym.proposedSalary}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-400">Proposed Rate</span>
-              </div>
-              <div className="p-4 bg-gray-900/50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <FiClock className="w-5 h-5 text-violet-400" />
-                  <span className="text-xl font-bold text-white">
-                    {new Date(gym.requestDate).toLocaleDateString()}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-400">Request Date</span>
-              </div>
-            </div>
-
-            {/* Description & Message */}
-            <div className="mt-6 space-y-4">
-              <div>
-                <h4 className="text-white font-medium mb-2">About the Gym</h4>
-                <p className="text-gray-400">{gym.description}</p>
-              </div>
-              <div>
-                <h4 className="text-white font-medium mb-2">Message</h4>
-                <div className="p-4 bg-gray-900/50 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <FiMessageSquare className="w-4 h-4 text-violet-400 mr-2" />
-                    <span className="text-gray-400">From Gym Management</span>
+                {/* Facilities */}
+                {facilities.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-white font-medium mb-2">Facilities</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {facilities.slice(0, 10).map((facility, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm"
+                        >
+                          {facility}
+                        </span>
+                      ))}
+                      {facilities.length > 10 && (
+                        <span className="px-3 py-1 bg-gray-900/50 text-gray-300 rounded-full text-sm">
+                          +{facilities.length - 10} more
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-gray-300">{gym.message}</p>
-                </div>
-              </div>
-            </div>
+                )}
 
-            {/* Facilities & Classes */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-white font-medium mb-2">Facilities</h4>
-                <div className="flex flex-wrap gap-2">
-                  {gym.facilities.map((facility, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm"
-                    >
-                      {facility}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h4 className="text-white font-medium mb-2">Classes</h4>
-                <div className="flex flex-wrap gap-2">
-                  {gym.classes.map((className, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-gray-900/50 text-gray-300 rounded-full text-sm"
-                    >
-                      {className}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Benefits */}
-            <div className="mt-6">
-              <h4 className="text-white font-medium mb-2">Benefits</h4>
-              <div className="flex flex-wrap gap-2">
-                {gym.benefits.map((benefit, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full text-sm"
-                  >
-                    {benefit}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Contact & Social */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center text-gray-400">
-                  <FiMail className="w-4 h-4 mr-2 text-violet-400" />
-                  {gym.email}
-                </div>
-                <div className="flex items-center text-gray-400">
-                  <FiPhone className="w-4 h-4 mr-2 text-violet-400" />
-                  {gym.phone}
-                </div>
-                <div className="flex items-center text-gray-400">
-                  <FiGlobe className="w-4 h-4 mr-2 text-violet-400" />
-                  <a
-                    href={gym.website}
-                    className="hover:text-violet-400 transition-colors"
-                  >
-                    {gym.website.replace("https://", "")}
-                  </a>
-                </div>
-              </div>
-              <div className="space-y-2">
-                {gym.social.instagram && (
-                  <div className="flex items-center text-gray-400">
-                    <FiInstagram className="w-4 h-4 mr-2 text-violet-400" />
-                    <a
-                      href={`https://instagram.com/${gym.social.instagram}`}
-                      className="hover:text-violet-400 transition-colors"
-                    >
-                      @{gym.social.instagram}
-                    </a>
+                {/* Contact */}
+                {(gymEmail !== 'N/A' || gymPhone !== 'N/A' || gymWebsite) && (
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      {gymEmail !== 'N/A' && (
+                        <div className="flex items-center text-gray-400">
+                          <FiMail className="w-4 h-4 mr-2 text-violet-400" />
+                          {gymEmail}
+                        </div>
+                      )}
+                      {gymPhone !== 'N/A' && (
+                        <div className="flex items-center text-gray-400">
+                          <FiPhone className="w-4 h-4 mr-2 text-violet-400" />
+                          {gymPhone}
+                        </div>
+                      )}
+                      {gymWebsite && (
+                        <div className="flex items-center text-gray-400">
+                          <FiGlobe className="w-4 h-4 mr-2 text-violet-400" />
+                          <a
+                            href={gymWebsite.startsWith('http') ? gymWebsite : `https://${gymWebsite}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-violet-400 transition-colors"
+                          >
+                            {gymWebsite.replace(/^https?:\/\//, '')}
+                          </a>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Reject Modal */}
-      {showRejectModal && selectedGym && (
+      {showRejectModal && selectedRequest && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
             <div
-              className="fixed inset-0 transition-opacity"
+              className="fixed inset-0 transition-opacity bg-black/60 backdrop-blur-sm"
               aria-hidden="true"
-            >
-              <div className="absolute inset-0 bg-gray-900 opacity-75"></div>
-            </div>
+              onClick={() => {
+                setShowRejectModal(false);
+                setRejectReason("");
+                setSelectedRequest(null);
+              }}
+            ></div>
 
-            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 rounded-2xl border border-gray-700 shadow-xl">
+            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 rounded-2xl border border-gray-700 shadow-xl relative z-10">
               <h3 className="text-lg font-medium text-white mb-4">
-                Reject Request from {selectedGym.name}
+                Reject Request from {selectedRequest.gym?.gymName || 'Gym'}
               </h3>
 
               <div className="mt-4">
@@ -396,7 +505,7 @@ function VerifyRejectGym() {
                 <textarea
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+                  className="w-full bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none resize-none"
                   rows="4"
                   placeholder="Please provide a reason for rejection..."
                 ></textarea>
@@ -407,14 +516,14 @@ function VerifyRejectGym() {
                   onClick={() => {
                     setShowRejectModal(false);
                     setRejectReason("");
-                    setSelectedGym(null);
+                    setSelectedRequest(null);
                   }}
                   className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => handleReject(selectedGym.id)}
+                  onClick={handleReject}
                   disabled={!rejectReason.trim() || isSubmitting}
                   className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >

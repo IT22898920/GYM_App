@@ -3,8 +3,11 @@ import mongoose from 'mongoose';
 const collaborationRequestSchema = new mongoose.Schema({
   fromGymOwner: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'User'
+  },
+  fromMember: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   toInstructor: {
     type: mongoose.Schema.Types.ObjectId,
@@ -35,6 +38,9 @@ const collaborationRequestSchema = new mongoose.Schema({
   respondedAt: {
     type: Date
   },
+  acceptedAt: {
+    type: Date
+  },
   expiresAt: {
     type: Date,
     default: function() {
@@ -48,6 +54,7 @@ const collaborationRequestSchema = new mongoose.Schema({
 
 // Indexes for efficient queries
 collaborationRequestSchema.index({ fromGymOwner: 1, status: 1 });
+collaborationRequestSchema.index({ fromMember: 1, status: 1 });
 collaborationRequestSchema.index({ toInstructor: 1, status: 1 });
 collaborationRequestSchema.index({ gym: 1 });
 collaborationRequestSchema.index({ expiresAt: 1 });

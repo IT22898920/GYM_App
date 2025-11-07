@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../../utils/api";
 import { Link } from "react-router-dom";
 import {
   FiSearch,
@@ -25,6 +26,9 @@ function GymOwners() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(false);
+  const [owners, setOwners] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
 
   const stats = [
     {
@@ -65,19 +69,28 @@ function GymOwners() {
     },
   ];
 
-  // Sample data for gym owners
-  const gymOwners = Array.from({ length: 50 }, (_, i) => ({
-    id: i + 1,
-    name: `Gym Owner ${i + 1}`,
-    email: `owner${i + 1}@example.com`,
-    gymName: `Fitness Center ${i + 1}`,
-    location: `City ${(i % 10) + 1}`,
-    memberCount: Math.floor(Math.random() * 1000) + 100,
-    status: Math.random() > 0.2 ? "active" : "inactive",
-    joinDate: "2024-02-01",
-    lastLogin: "2024-02-20 10:00",
-    avatar: `https://i.pravatar.cc/150?img=${i % 70}`,
-  }));
+  useEffect(() => {
+    const fetchOwners = async () => {
+      setLoading(true);
+      try {
+        const res = await api.getUsersAdmin({
+          role: 'gymOwner',
+          status: selectedStatus,
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm
+        });
+        setOwners(res.data || []);
+        setTotalItems(res.pagination?.totalItems || 0);
+      } catch (e) {
+        setOwners([]);
+        setTotalItems(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOwners();
+  }, [selectedStatus, currentPage, itemsPerPage, searchTerm]);
 
   const statusOptions = [
     { value: "all", label: "All Status" },
@@ -85,23 +98,9 @@ function GymOwners() {
     { value: "inactive", label: "Inactive" },
   ];
 
-  const filteredOwners = gymOwners.filter((owner) => {
-    const matchesSearch =
-      owner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      owner.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      owner.gymName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      selectedStatus === "all" || owner.status === selectedStatus;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // Pagination calculations
-  const totalItems = filteredOwners.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentOwners = filteredOwners.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -237,21 +236,21 @@ function GymOwners() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {currentOwners.map((owner) => (
+              {owners.map((owner) => (
                 <tr
-                  key={owner.id}
+                  key={owner._id}
                   className="hover:bg-gray-700/20 transition-colors"
                 >
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
                       <img
-                        src={owner.avatar}
-                        alt={owner.name}
+                        src={owner.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent((owner.firstName||'')[0]||'U')}`}
+                        alt={owner.firstName}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div>
                         <div className="font-medium text-white">
-                          {owner.name}
+                          {owner.firstName} {owner.lastName}
                         </div>
                         <div className="text-sm text-gray-400">
                           {owner.email}
@@ -259,23 +258,23 @@ function GymOwners() {
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 text-gray-300">{owner.gymName}</td>
-                  <td className="p-4 text-gray-300">{owner.location}</td>
-                  <td className="p-4 text-gray-300">{owner.memberCount}</td>
+                  <td className="p-4 text-gray-300">{owner.gymDetails?.gymName || '-'}</td>
+                  <td className="p-4 text-gray-300">{owner.gymDetails?.gymAddress?.city || '-'}</td>
+                  <td className="p-4 text-gray-300">-</td>
                   <td className="p-4">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-                        owner.status === "active"
+                        owner.isActive
                           ? "bg-green-500/10 text-green-400"
                           : "bg-red-500/10 text-red-400"
                       }`}
                     >
-                      {owner.status === "active" ? (
+                      {owner.isActive ? (
                         <FiCheck className="w-4 h-4 mr-1" />
                       ) : (
                         <FiX className="w-4 h-4 mr-1" />
                       )}
-                      {owner.status}
+                      {owner.isActive ? 'active' : 'inactive'}
                     </span>
                   </td>
                   <td className="p-4">

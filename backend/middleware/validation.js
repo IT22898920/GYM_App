@@ -25,7 +25,7 @@ export const validateRegister = [
   
   body('role')
     .optional()
-    .isIn(['customer', 'instructor', 'gymOwner', 'admin'])
+    .isIn(['customer', 'instructor', 'gymOwner', 'admin', 'receptionist'])
     .withMessage('Invalid role specified'),
   
   body('phone')

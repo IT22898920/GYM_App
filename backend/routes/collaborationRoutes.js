@@ -4,7 +4,8 @@ import {
   getGymOwnerRequests,
   getInstructorRequests,
   respondToRequest,
-  cancelRequest
+  cancelRequest,
+  createMemberInstructorChat
 } from '../controllers/collaborationController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -21,5 +22,8 @@ router.put('/:requestId/cancel', authorize('gymOwner', 'gym-owner'), cancelReque
 // Instructor routes
 router.get('/instructor', authorize('instructor'), getInstructorRequests);
 router.put('/:requestId/respond', authorize('instructor'), respondToRequest);
+
+// Member routes
+router.post('/member-instructor', authorize('customer'), createMemberInstructorChat);
 
 export default router;

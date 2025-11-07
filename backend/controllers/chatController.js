@@ -44,11 +44,16 @@ export const getOrCreateChat = async (req, res) => {
     const { collaborationId } = req.params;
     const userId = req.user.id;
     
+    console.log('Getting chat for collaboration:', collaborationId, 'user:', userId);
+    
     // Verify collaboration exists and is accepted
     const collaboration = await CollaborationRequest.findById(collaborationId)
       .populate('fromGymOwner', 'firstName lastName')
+      .populate('fromMember', 'firstName lastName')
       .populate('toInstructor', 'firstName lastName')
       .populate('gym', 'gymName');
+      
+    console.log('Found collaboration:', collaboration);
       
     if (!collaboration) {
       return res.status(404).json({
@@ -65,10 +70,11 @@ export const getOrCreateChat = async (req, res) => {
     }
     
     // Verify user is part of the collaboration
-    const isGymOwner = collaboration.fromGymOwner._id.toString() === userId;
+    const isGymOwner = collaboration.fromGymOwner && collaboration.fromGymOwner._id.toString() === userId;
+    const isMember = collaboration.fromMember && collaboration.fromMember._id.toString() === userId;
     const isInstructor = collaboration.toInstructor._id.toString() === userId;
     
-    if (!isGymOwner && !isInstructor) {
+    if (!isGymOwner && !isMember && !isInstructor) {
       return res.status(403).json({
         success: false,
         message: 'You are not authorized to access this chat'
@@ -84,8 +90,23 @@ export const getOrCreateChat = async (req, res) => {
     
     // Create new chat if doesn't exist
     if (!chat) {
+      // Determine participants based on collaboration type
+      let participants;
+      if (collaboration.fromGymOwner) {
+        // Gym owner - instructor collaboration
+        participants = [collaboration.fromGymOwner._id, collaboration.toInstructor._id];
+      } else if (collaboration.fromMember) {
+        // Member - instructor collaboration
+        participants = [collaboration.fromMember._id, collaboration.toInstructor._id];
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid collaboration type'
+        });
+      }
+      
       chat = new Chat({
-        participants: [collaboration.fromGymOwner._id, collaboration.toInstructor._id],
+        participants: participants,
         collaborationRequest: collaborationId,
         gym: collaboration.gym._id,
         messages: []

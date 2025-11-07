@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../../utils/api";
 import { Link } from "react-router-dom";
 import {
   FiSearch,
@@ -25,6 +26,9 @@ function Receptionists() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(false);
+  const [receptionists, setReceptionists] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
 
   const stats = [
     {
@@ -65,18 +69,28 @@ function Receptionists() {
     },
   ];
 
-  // Sample data for receptionists
-  const receptionists = Array.from({ length: 50 }, (_, i) => ({
-    id: i + 1,
-    name: `Receptionist ${i + 1}`,
-    email: `receptionist${i + 1}@example.com`,
-    shift: ["Morning", "Afternoon", "Evening"][Math.floor(Math.random() * 3)],
-    location: `Branch ${Math.floor(i / 5) + 1}`,
-    joinDate: "2024-02-01",
-    lastShift: "2024-02-20 10:00",
-    status: Math.random() > 0.2 ? "active" : "inactive",
-    avatar: `https://i.pravatar.cc/150?img=${i % 70}`,
-  }));
+  useEffect(() => {
+    const fetchReceptionists = async () => {
+      setLoading(true);
+      try {
+        const res = await api.getUsersAdmin({
+          role: 'receptionist',
+          status: selectedStatus,
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm
+        });
+        setReceptionists(res.data || []);
+        setTotalItems(res.pagination?.totalItems || 0);
+      } catch (e) {
+        setReceptionists([]);
+        setTotalItems(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReceptionists();
+  }, [selectedStatus, currentPage, itemsPerPage, searchTerm]);
 
   const statusOptions = [
     { value: "all", label: "All Status" },
@@ -84,25 +98,9 @@ function Receptionists() {
     { value: "inactive", label: "Inactive" },
   ];
 
-  const filteredReceptionists = receptionists.filter((receptionist) => {
-    const matchesSearch =
-      receptionist.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      receptionist.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      selectedStatus === "all" || receptionist.status === selectedStatus;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // Pagination calculations
-  const totalItems = filteredReceptionists.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentReceptionists = filteredReceptionists.slice(
-    startIndex,
-    endIndex
-  );
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -240,21 +238,21 @@ function Receptionists() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {currentReceptionists.map((receptionist) => (
+              {receptionists.map((receptionist) => (
                 <tr
-                  key={receptionist.id}
+                  key={receptionist._id}
                   className="hover:bg-gray-700/20 transition-colors"
                 >
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
                       <img
-                        src={receptionist.avatar}
-                        alt={receptionist.name}
+                        src={receptionist.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent((receptionist.firstName||'')[0]||'U')}`}
+                        alt={receptionist.firstName}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div>
                         <div className="font-medium text-white">
-                          {receptionist.name}
+                          {receptionist.firstName} {receptionist.lastName}
                         </div>
                         <div className="text-sm text-gray-400">
                           {receptionist.email}
@@ -263,36 +261,24 @@ function Receptionists() {
                     </div>
                   </td>
                   <td className="p-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        receptionist.shift === "Morning"
-                          ? "bg-blue-500/10 text-blue-400"
-                          : receptionist.shift === "Afternoon"
-                          ? "bg-amber-500/10 text-amber-400"
-                          : "bg-violet-500/10 text-violet-400"
-                      }`}
-                    >
-                      {receptionist.shift}
-                    </span>
+                    <span className="text-gray-300">-</span>
                   </td>
-                  <td className="p-4 text-gray-300">{receptionist.location}</td>
-                  <td className="p-4 text-gray-300">
-                    {receptionist.lastShift}
-                  </td>
+                  <td className="p-4 text-gray-300">-</td>
+                  <td className="p-4 text-gray-300">-</td>
                   <td className="p-4">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-                        receptionist.status === "active"
+                        receptionist.isActive
                           ? "bg-green-500/10 text-green-400"
                           : "bg-red-500/10 text-red-400"
                       }`}
                     >
-                      {receptionist.status === "active" ? (
+                      {receptionist.isActive ? (
                         <FiCheck className="w-4 h-4 mr-1" />
                       ) : (
                         <FiX className="w-4 h-4 mr-1" />
                       )}
-                      {receptionist.status}
+                      {receptionist.isActive ? 'active' : 'inactive'}
                     </span>
                   </td>
                   <td className="p-4">

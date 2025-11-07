@@ -21,6 +21,7 @@ import { useAlert } from '../../contexts/AlertContext';
 
 function InstructorApplications() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedFreelancing, setSelectedFreelancing] = useState("all");
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -84,10 +85,20 @@ function InstructorApplications() {
   };
 
   const filteredApplications = applications.filter(
-    (app) =>
-      `${app.firstName} ${app.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+    (app) => {
+      // Search filter
+      const matchesSearch =
+        `${app.firstName} ${app.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.specialization.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Freelancing filter
+      const matchesFreelancing = selectedFreelancing === 'all' ||
+        (selectedFreelancing === 'freelancing' && app.isFreelance === true) ||
+        (selectedFreelancing === 'non-freelancing' && app.isFreelance === false);
+      
+      return matchesSearch && matchesFreelancing;
+    }
   );
 
   // Helper function to format availability
@@ -184,6 +195,17 @@ function InstructorApplications() {
                 className="w-full bg-gray-900/50 text-white rounded-lg pl-12 pr-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
               />
             </div>
+          </div>
+          <div>
+            <select
+              value={selectedFreelancing}
+              onChange={(e) => setSelectedFreelancing(e.target.value)}
+              className="w-full md:w-48 bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+            >
+              <option value="all">All Types</option>
+              <option value="freelancing">Freelancing</option>
+              <option value="non-freelancing">Non-Freelancing</option>
+            </select>
           </div>
         </div>
       </div>

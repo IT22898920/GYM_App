@@ -1,5 +1,60 @@
 import User from '../models/User.js';
 
+// Admin: list users with filters
+export const adminListUsers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, role = 'all', status = 'all', search = '' } = req.query;
+
+    const filter = {};
+
+    if (role !== 'all') {
+      filter.role = role;
+    }
+
+    if (status !== 'all') {
+      filter.isActive = status === 'active';
+    }
+
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filter.$or = [
+        { firstName: regex },
+        { lastName: regex },
+        { email: regex }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('-password -refreshToken')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      User.countDocuments(filter)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: users,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error listing users (admin):', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users',
+      error: error.message
+    });
+  }
+};
+
 // Update user bank account details
 export const updateBankAccount = async (req, res) => {
   try {

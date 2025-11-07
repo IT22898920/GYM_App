@@ -16,7 +16,9 @@ import {
   addExistingUserAsMember,
   getMyProfile,
   getMyWorkoutPlans,
-  updateWorkoutStatus
+  updateWorkoutStatus,
+  addMemberNote,
+  deleteMemberNote
 } from '../controllers/memberController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -29,6 +31,8 @@ router.post('/register/:gymId', uploadReceipt, registerCustomerToGym);
 router.get('/my-profile', protect, authorize('customer'), getMyProfile);
 router.get('/my-workout-plans', protect, authorize('customer'), getMyWorkoutPlans);
 router.patch('/update-workout-status', protect, authorize('customer'), updateWorkoutStatus);
+router.post('/add-member-note', protect, authorize('customer'), addMemberNote);
+router.delete('/delete-member-note', protect, authorize('customer'), deleteMemberNote);
 
 // All routes below require authentication and gym owner authorization
 router.use(protect);

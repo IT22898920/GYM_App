@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   FiUsers,
@@ -28,8 +28,11 @@ import {
   FiChevronsLeft,
   FiChevronsRight,
 } from "react-icons/fi";
+import api from "../../../utils/api";
+import { useAlert } from "../../../contexts/AlertContext";
 
 function GymStudents() {
+  const { showSuccess, showError } = useAlert();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -37,141 +40,50 @@ function GymStudents() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-
-  const stats = [
-    {
-      title: "Total Students",
-      value: "124",
-      change: "+12.5%",
-      trend: "up",
-      icon: FiUsers,
-      color: "violet",
-      description: "Active students",
-    },
-    {
-      title: "Avg. Progress",
-      value: "78%",
-      change: "+23.4%",
-      trend: "up",
-      icon: FiTrendingUp,
-      color: "emerald",
-      description: "Goal achievement",
-    },
-    {
-      title: "Class Attendance",
-      value: "92%",
-      change: "+15.2%",
-      trend: "up",
-      icon: FiActivity,
-      color: "blue",
-      description: "Average attendance",
-    },
-    {
-      title: "Retention Rate",
-      value: "95%",
-      change: "+8.7%",
-      trend: "up",
-      icon: FiHeart,
-      color: "amber",
-      description: "Student retention",
-    },
-  ];
-
-  // Sample data for classes
-  const classes = [
-    { id: "all", name: "All Classes" },
-    { id: "yoga-flow", name: "Morning Yoga Flow" },
-    { id: "hiit", name: "HIIT Training" },
-    { id: "strength", name: "Strength Basics" },
-  ];
-
-  // Sample data for students
-  const students = [
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john@example.com",
-      class: "Morning Yoga Flow",
-      joinDate: "2024-02-15",
-      status: "active",
-      progress: 75,
-      lastSession: "2024-03-05",
-      image: "https://i.pravatar.cc/150?img=1",
-      measurements: {
-        height: "180 cm",
-        weight: "75 kg",
-        bodyFat: "18%",
-        bmi: "23.1",
-        chest: "42 inches",
-        waist: "32 inches",
-        hips: "38 inches",
-        biceps: "14 inches",
-        thighs: "22 inches",
-      },
-      goals: ["Weight Loss", "Muscle Gain"],
-      nextSession: "2024-03-10 09:00 AM",
-      attendance: 85,
-    },
-    {
-      id: 2,
-      name: "Sarah Smith",
-      email: "sarah@example.com",
-      class: "HIIT Training",
-      joinDate: "2024-02-01",
-      status: "active",
-      progress: 60,
-      lastSession: "2024-03-06",
-      image: "https://i.pravatar.cc/150?img=2",
-      measurements: {
-        height: "165 cm",
-        weight: "58 kg",
-        bodyFat: "22%",
-        bmi: "21.3",
-        chest: "36 inches",
-        waist: "28 inches",
-        hips: "36 inches",
-        biceps: "11 inches",
-        thighs: "20 inches",
-      },
-      goals: ["Endurance", "Toning"],
-      nextSession: "2024-03-10 10:30 AM",
-      attendance: 92,
-    },
-  ];
-
-  // Generate more sample data for pagination demonstration
-  const generateStudents = () => {
-    return Array.from({ length: 50 }, (_, index) => {
-      const baseStudent = students[index % students.length];
-      return {
-        ...baseStudent,
-        id: index + 1,
-        name: `${baseStudent.name} ${Math.floor(index / students.length) + 1}`,
-        email: `student${index + 1}@example.com`,
-      };
-    });
-  };
-
-  const allStudents = generateStudents();
-
-  // Filtering and pagination
-  const filteredStudents = allStudents.filter((student) => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesClass =
-      selectedClass === "all" ||
-      student.class === classes.find((c) => c.id === selectedClass)?.name;
-    const matchesStatus =
-      selectedStatus === "all" || student.status === selectedStatus;
-    return matchesSearch && matchesClass && matchesStatus;
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalMembers: 0,
+    hasNextPage: false,
+    hasPrevPage: false
   });
 
-  const totalItems = filteredStudents.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentStudents = filteredStudents.slice(startIndex, endIndex);
+  // Fetch assigned members on mount
+  useEffect(() => {
+    fetchAssignedMembers();
+  }, [currentPage, searchTerm, selectedStatus]);
+
+  const fetchAssignedMembers = async () => {
+    try {
+      setLoading(true);
+      const params = {
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchTerm,
+        status: selectedStatus
+      };
+
+      const response = await api.getInstructorAssignedMembers(params);
+      
+      if (response.success) {
+        setStudents(response.data || []);
+        setPagination(response.pagination || {
+          currentPage: 1,
+          totalPages: 1,
+          totalMembers: 0,
+          hasNextPage: false,
+          hasPrevPage: false
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching assigned members:', error);
+      setStudents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -187,16 +99,71 @@ function GymStudents() {
     setShowMeasurementsModal(true);
   };
 
+  // Calculate stats from real data
+  const totalStudents = pagination.totalMembers;
+  const avgProgress = students.length > 0 
+    ? Math.round(students.reduce((sum, student) => sum + (student.progress || 0), 0) / students.length)
+    : 0;
+  const activeStudents = students.filter(s => s.status === 'active').length;
+  const attendance = totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0;
+
+  const stats = [
+    {
+      title: "Total Students",
+      value: totalStudents.toString(),
+      change: "+0%",
+      trend: "up",
+      icon: FiUsers,
+      color: "violet",
+      description: "Assigned students",
+    },
+    {
+      title: "Avg. Progress",
+      value: `${avgProgress}%`,
+      change: "+0%",
+      trend: "up",
+      icon: FiTrendingUp,
+      color: "emerald",
+      description: "Goal achievement",
+    },
+    {
+      title: "Class Attendance",
+      value: `${attendance}%`,
+      change: "+0%",
+      trend: "up",
+      icon: FiActivity,
+      color: "blue",
+      description: "Average attendance",
+    },
+    {
+      title: "Retention Rate",
+      value: "95%",
+      change: "+0%",
+      trend: "up",
+      icon: FiHeart,
+      color: "amber",
+      description: "Student retention",
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-            My Students
+            Gym Students
           </h1>
           <p className="text-gray-400 mt-1">
-            Manage and track your students' progress
+            Manage and track your gym students' progress
           </p>
         </div>
       </div>
@@ -265,17 +232,6 @@ function GymStudents() {
           </div>
           <div className="flex gap-4">
             <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-            >
-              {classes.map((cls) => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.name}
-                </option>
-              ))}
-            </select>
-            <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="bg-gray-900/50 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
@@ -302,7 +258,7 @@ function GymStudents() {
                   Student
                 </th>
                 <th className="text-left p-4 text-gray-400 font-medium">
-                  Class
+                  Gym
                 </th>
                 <th className="text-left p-4 text-gray-400 font-medium">
                   Progress
@@ -314,205 +270,212 @@ function GymStudents() {
                   Status
                 </th>
                 <th className="text-left p-4 text-gray-400 font-medium">
-                  Next Session
-                </th>
-                <th className="text-left p-4 text-gray-400 font-medium">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-              {currentStudents.map((student) => (
-                <tr
-                  key={student.id}
-                  className="hover:bg-gray-700/20 transition-colors"
-                >
-                  <td className="p-4">
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={student.image}
-                        alt={student.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                      <div>
-                        <div className="font-medium text-white">
-                          {student.name}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          {student.email}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm">
-                      {student.class}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-violet-500 rounded-full"
-                          style={{ width: `${student.progress}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-gray-400 text-sm">
-                        {student.progress}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="text-gray-300">{student.attendance}%</div>
-                    <div className="text-sm text-gray-400">
-                      Last: {student.lastSession}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-                        student.status === "active"
-                          ? "bg-green-500/10 text-green-400"
-                          : "bg-red-500/10 text-red-400"
-                      }`}
-                    >
-                      {student.status === "active" ? (
-                        <FiCheck className="w-4 h-4 mr-1" />
-                      ) : (
-                        <FiX className="w-4 h-4 mr-1" />
-                      )}
-                      {student.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-300">
-                    {student.nextSession || "Not scheduled"}
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => handleViewMeasurements(student)}
-                        className="p-2 text-gray-400 hover:text-violet-400 transition-colors"
-                        title="View Measurements"
-                      >
-                        <FiMaximize2 className="w-5 h-5" />
-                      </button>
-                      <Link
-                        to={`/instructor/workout-plans/create?student=${student.id}`}
-                        className="p-2 text-gray-400 hover:text-white transition-colors"
-                        title="Create Workout Plan"
-                      >
-                        <FiFileText className="w-5 h-5" />
-                      </Link>
-                      <Link
-                        to={`/instructor/students/${student.id}/progress`}
-                        className="p-2 text-gray-400 hover:text-white transition-colors"
-                        title="View Progress"
-                      >
-                        <FiBarChart2 className="w-5 h-5" />
-                      </Link>
-                    </div>
+              {students.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-gray-400">
+                    <FiUsers className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+                    <p className="text-lg font-medium mb-2">No Gym Students Yet</p>
+                    <p>You haven't been assigned any gym students yet.</p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                students.map((student) => (
+                  <tr
+                    key={student._id}
+                    className="hover:bg-gray-700/20 transition-colors"
+                  >
+                    <td className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 rounded-full bg-violet-500/10 flex items-center justify-center">
+                          <FiUser className="h-5 w-5 text-violet-400" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-white">
+                            {student.firstName} {student.lastName}
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {student.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm">
+                        {student.gym?.gymName || 'Not assigned'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-violet-500 rounded-full"
+                            style={{ width: `${student.progress || 0}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-gray-400 text-sm">
+                          {student.progress || 0}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-gray-300">{student.attendance || 0}%</div>
+                      <div className="text-sm text-gray-400">
+                        Classes: {student.classesAttended || 0}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
+                          student.status === "active"
+                            ? "bg-green-500/10 text-green-400"
+                            : "bg-red-500/10 text-red-400"
+                        }`}
+                      >
+                        {student.status === "active" ? (
+                          <FiCheck className="w-4 h-4 mr-1" />
+                        ) : (
+                          <FiX className="w-4 h-4 mr-1" />
+                        )}
+                        {student.status}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => handleViewMeasurements(student)}
+                          className="p-2 text-gray-400 hover:text-violet-400 transition-colors"
+                          title="View Measurements"
+                        >
+                          <FiMaximize2 className="w-5 h-5" />
+                        </button>
+                        <Link
+                          to={`/instructor/workout-plans/create?student=${student._id}`}
+                          className="p-2 text-gray-400 hover:text-white transition-colors"
+                          title="Create Workout Plan"
+                        >
+                          <FiFileText className="w-5 h-5" />
+                        </Link>
+                        <Link
+                          to={`/instructor/students/${student._id}/progress`}
+                          className="p-2 text-gray-400 hover:text-white transition-colors"
+                          title="View Progress"
+                        >
+                          <FiBarChart2 className="w-5 h-5" />
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination Controls */}
-        <div className="px-4 py-3 border-t border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <span>Show</span>
-            <select
-              value={itemsPerPage}
-              onChange={handleItemsPerPageChange}
-              className="bg-gray-900/50 text-white rounded-lg px-2 py-1 border border-gray-700/50 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
-            >
-              {[5, 10, 25, 50].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-            <span>entries</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-sm text-gray-400">
-              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of{" "}
-              {totalItems} entries
+        {students.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <span>Show</span>
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="bg-gray-900/50 text-white rounded-lg px-2 py-1 border border-gray-700/50 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none"
+              >
+                {[5, 10, 25, 50].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+              <span>entries</span>
             </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handlePageChange(1)}
-                disabled={currentPage === 1}
-                className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <FiChevronsLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <FiChevronLeft className="w-5 h-5" />
-              </button>
-
-              {/* Page Numbers */}
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, index) => {
-                  const pageNumber = index + 1;
-                  // Show first page, last page, current page, and one page before and after current page
-                  if (
-                    pageNumber === 1 ||
-                    pageNumber === totalPages ||
-                    (pageNumber >= currentPage - 1 &&
-                      pageNumber <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={pageNumber}
-                        onClick={() => handlePageChange(pageNumber)}
-                        className={`min-w-[2.5rem] h-10 rounded-lg ${
-                          currentPage === pageNumber
-                            ? "bg-violet-600 text-white"
-                            : "text-gray-400 hover:text-white hover:bg-gray-700/50"
-                        } transition-colors`}
-                      >
-                        {pageNumber}
-                      </button>
-                    );
-                  } else if (
-                    pageNumber === currentPage - 2 ||
-                    pageNumber === currentPage + 2
-                  ) {
-                    return (
-                      <span key={pageNumber} className="text-gray-600">
-                        ...
-                      </span>
-                    );
-                  }
-                  return null;
-                })}
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-400">
+                Showing {pagination.currentPage} of {pagination.totalPages} pages
               </div>
 
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <FiChevronRight className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handlePageChange(totalPages)}
-                disabled={currentPage === totalPages}
-                className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <FiChevronsRight className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                  className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FiChevronsLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FiChevronLeft className="w-5 h-5" />
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(pagination.totalPages, 7) }).map((_, index) => {
+                    const pageNumber = index + 1;
+                    if (pagination.totalPages <= 7) {
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`min-w-[2.5rem] h-10 rounded-lg ${
+                            currentPage === pageNumber
+                              ? "bg-violet-600 text-white"
+                              : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                          } transition-colors`}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    } else if (
+                      pageNumber === 1 ||
+                      pageNumber === pagination.totalPages ||
+                      (pageNumber >= currentPage - 1 &&
+                        pageNumber <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`min-w-[2.5rem] h-10 rounded-lg ${
+                            currentPage === pageNumber
+                              ? "bg-violet-600 text-white"
+                              : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                          } transition-colors`}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === pagination.totalPages}
+                  className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FiChevronRight className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  disabled={currentPage === pagination.totalPages}
+                  className="p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FiChevronsRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Measurements Modal */}
@@ -529,7 +492,7 @@ function GymStudents() {
             <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-800 rounded-2xl border border-gray-700 shadow-xl">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-white">
-                  {selectedStudent.name}'s Measurements
+                  {selectedStudent.firstName} {selectedStudent.lastName}'s Measurements
                 </h3>
                 <button
                   onClick={() => setShowMeasurementsModal(false)}
@@ -539,36 +502,40 @@ function GymStudents() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                {Object.entries(selectedStudent.measurements).map(
-                  ([key, value]) => (
-                    <div key={key} className="bg-gray-900/50 rounded-lg p-4">
-                      <div className="text-gray-400 capitalize mb-2">
-                        {key.replace(/([A-Z])/g, " $1").trim()}
+              {selectedStudent.bodyMeasurements && (
+                <div className="grid grid-cols-2 gap-6">
+                  {Object.entries(selectedStudent.bodyMeasurements).map(
+                    ([key, value]) => (
+                      <div key={key} className="bg-gray-900/50 rounded-lg p-4">
+                        <div className="text-gray-400 capitalize mb-2">
+                          {key.replace(/([A-Z])/g, " $1").trim()}
+                        </div>
+                        <div className="text-2xl font-bold text-white">
+                          {value}
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-white">
-                        {value}
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-
-              <div className="mt-8">
-                <h4 className="text-lg font-semibold text-white mb-4">
-                  Fitness Goals
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {selectedStudent.goals.map((goal, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm"
-                    >
-                      {goal}
-                    </span>
-                  ))}
+                    )
+                  )}
                 </div>
-              </div>
+              )}
+
+              {selectedStudent.fitnessGoals && selectedStudent.fitnessGoals.length > 0 && (
+                <div className="mt-8">
+                  <h4 className="text-lg font-semibold text-white mb-4">
+                    Fitness Goals
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedStudent.fitnessGoals.map((goal, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-violet-500/10 text-violet-400 rounded-full text-sm"
+                      >
+                        {goal}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-8 flex justify-end">
                 <button
