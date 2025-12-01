@@ -17,9 +17,11 @@ import memberRoutes from './routes/memberRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import gifRoutes from './routes/gifRoutes.js';
 import classRoutes from './routes/classRoutes.js';
+import mobileRoutes from './routes/mobileRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { initializeFirebase } from './services/fcmService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,16 +32,34 @@ dotenv.config();
 // Connect to MongoDB
 connectDB();
 
+// Initialize Firebase for push notifications
+initializeFirebase();
+
 // Initialize express app
 const app = express();
 
-// CORS configuration
+// CORS configuration - Updated for mobile app support
+const allowedOrigins = [
+  process.env.CLIENT_URL || 'http://localhost:5173',
+  'http://localhost:8080',   // Flutter web dev server
+  'capacitor://localhost',    // Capacitor mobile
+  'ionic://localhost',        // Ionic mobile
+  'http://localhost:3000',    // Alternative dev port
+];
+
 const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for mobile compatibility
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
 };
 
 // Middleware
@@ -72,6 +92,7 @@ app.use('/api/members', memberRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/gifs', gifRoutes);
 app.use('/api/classes', classRoutes);
+app.use('/api/mobile', mobileRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

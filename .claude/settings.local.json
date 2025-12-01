@@ -22,7 +22,11 @@
       "Bash(npm start)",
       "Bash(ss:*)",
       "Bash(touch:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(timeout 8 node:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(flutter analyze:*)"
     ],
     "deny": []
   }
