@@ -10,6 +10,8 @@ import {
   getApplicationStats,
   getVerifiedInstructors,
   toggleInstructorStatus,
+  suspendInstructor,
+  unsuspendInstructor,
   getInstructorById,
   getFreelanceInstructors,
   getAssignedMembers,
@@ -51,6 +53,8 @@ router.get('/admin/stats', authorize('admin'), getApplicationStats);
 router.get('/admin/verified', authorize('admin'), getVerifiedInstructors);
 router.get('/admin/instructor/:id', authorize('admin'), getInstructorById);
 router.put('/admin/instructor/:id/toggle-status', authorize('admin'), toggleInstructorStatus);
+router.put('/admin/instructor/:id/suspend', authorize('admin'), suspendInstructor);
+router.put('/admin/instructor/:id/unsuspend', authorize('admin'), unsuspendInstructor);
 
 // PARAMETERIZED ROUTES - These MUST come LAST
 router.get('/:id', getApplicationById);

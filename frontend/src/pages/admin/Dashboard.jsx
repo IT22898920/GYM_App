@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import api from "../../utils/api";
 import {
   FiUsers,
   FiDollarSign,
@@ -21,10 +22,45 @@ import {
 function Dashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState("week");
   const [isLoaded, setIsLoaded] = useState(false);
+  const [subscriptionStats, setSubscriptionStats] = useState(null);
+  const [suspensionStats, setSuspensionStats] = useState(null);
+  const [expiringSubscriptions, setExpiringSubscriptions] = useState([]);
 
   useEffect(() => {
     setIsLoaded(true);
+    fetchSubscriptionStats();
+    fetchSuspensionStats();
+    fetchExpiringSubscriptions();
   }, []);
+
+  const fetchSubscriptionStats = async () => {
+    try {
+      const response = await api.get("/admin/subscriptions/stats");
+      setSubscriptionStats(response.data.data);
+    } catch (error) {
+      console.error("Error fetching subscription stats:", error);
+    }
+  };
+
+  const fetchSuspensionStats = async () => {
+    try {
+      const response = await api.get("/admin/suspensions/stats");
+      setSuspensionStats(response.data.data);
+    } catch (error) {
+      console.error("Error fetching suspension stats:", error);
+    }
+  };
+
+  const fetchExpiringSubscriptions = async () => {
+    try {
+      const response = await api.get("/admin/subscriptions", {
+        params: { expiringSoon: 7, limit: 5 }
+      });
+      setExpiringSubscriptions(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching expiring subscriptions:", error);
+    }
+  };
 
   const stats = [
     {
@@ -124,16 +160,16 @@ function Dashboard() {
 
   const quickActions = [
     {
-      title: "Add Member",
-      icon: FiUserPlus,
+      title: "Subscriptions",
+      icon: FiDollarSign,
       color: "violet",
-      path: "/admin/members/add",
+      path: "/admin/subscriptions",
     },
     {
-      title: "Schedule Class",
-      icon: FiCalendar,
-      color: "blue",
-      path: "/admin/classes/add",
+      title: "Suspensions",
+      icon: FiAlertCircle,
+      color: "red",
+      path: "/admin/suspensions",
     },
     {
       title: "View Reports",
@@ -239,6 +275,124 @@ function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Subscription & Suspension Management Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Subscription Management Widget */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 overflow-hidden">
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <FiDollarSign className="text-violet-400" />
+                Subscription Management
+              </h2>
+              <Link
+                to="/admin/subscriptions"
+                className="text-violet-400 hover:text-violet-300 transition-colors text-sm"
+              >
+                Manage
+              </Link>
+            </div>
+          </div>
+          <div className="p-6">
+            {subscriptionStats ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-700/30 rounded-lg p-4">
+                    <p className="text-gray-400 text-sm mb-1">Active Subscriptions</p>
+                    <p className="text-2xl font-bold text-white">{subscriptionStats.totalActive || 0}</p>
+                  </div>
+                  <div className="bg-gray-700/30 rounded-lg p-4">
+                    <p className="text-gray-400 text-sm mb-1">Total Revenue</p>
+                    <p className="text-2xl font-bold text-emerald-400">
+                      ${subscriptionStats.totalRevenue?.toFixed(2) || "0.00"}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-amber-400 text-sm font-medium mb-1">Expiring Soon (7 days)</p>
+                      <p className="text-2xl font-bold text-amber-400">{subscriptionStats.expiringSoon || 0}</p>
+                    </div>
+                    <FiAlertCircle className="w-8 h-8 text-amber-400" />
+                  </div>
+                </div>
+                {expiringSubscriptions.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-gray-400 text-sm mb-2">Upcoming Expirations:</p>
+                    <div className="space-y-2">
+                      {expiringSubscriptions.slice(0, 3).map((sub) => (
+                        <div key={sub._id} className="flex items-center justify-between text-sm">
+                          <span className="text-gray-300">
+                            {sub.firstName} {sub.lastName}
+                          </span>
+                          <span className="text-amber-400">
+                            {sub.membershipPlan?.endDate
+                              ? new Date(sub.membershipPlan.endDate).toLocaleDateString()
+                              : "N/A"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 py-8">Loading subscription stats...</div>
+            )}
+          </div>
+        </div>
+
+        {/* Suspension Management Widget */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 overflow-hidden">
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <FiAlertCircle className="text-red-400" />
+                Suspension Management
+              </h2>
+              <Link
+                to="/admin/suspensions"
+                className="text-red-400 hover:text-red-300 transition-colors text-sm"
+              >
+                Manage
+              </Link>
+            </div>
+          </div>
+          <div className="p-6">
+            {suspensionStats ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                    <p className="text-red-400 text-sm mb-1">Suspended Gyms</p>
+                    <p className="text-2xl font-bold text-red-400">{suspensionStats.gymSuspensions || 0}</p>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                    <p className="text-red-400 text-sm mb-1">Suspended Instructors</p>
+                    <p className="text-2xl font-bold text-red-400">{suspensionStats.instructorSuspensions || 0}</p>
+                  </div>
+                </div>
+                <div className="bg-gray-700/30 rounded-lg p-4">
+                  <p className="text-gray-400 text-sm mb-1">Recent Suspensions (30 days)</p>
+                  <p className="text-2xl font-bold text-white">{suspensionStats.recentSuspensions || 0}</p>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-emerald-400 text-sm mb-1">Total Unsuspensions</p>
+                      <p className="text-2xl font-bold text-emerald-400">{suspensionStats.totalUnsuspensions || 0}</p>
+                    </div>
+                    <FiCheckCircle className="w-8 h-8 text-emerald-400" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 py-8">Loading suspension stats...</div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Recent Members & Upcoming Classes */}

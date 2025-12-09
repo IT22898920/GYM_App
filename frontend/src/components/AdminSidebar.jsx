@@ -23,6 +23,7 @@ import {
   FiHeart,
   FiTrendingUp,
   FiCheckCircle,
+  FiAlertCircle,
 } from "react-icons/fi";
 import { MdOutlineSportsGymnastics } from "react-icons/md";
 
@@ -97,9 +98,14 @@ function AdminSidebar({ isOpen }) {
         submenu: true,
         items: [
           { title: "Payments", path: "/admin/finance" },
+          { title: "Subscriptions", path: "/admin/subscriptions" },
           // { title: "Invoices", path: "/admin/invoices" },
-          // { title: "Subscriptions", path: "/admin/subscriptions" },
         ],
+      },
+      {
+        title: "Suspensions",
+        icon: FiAlertCircle,
+        path: "/admin/suspensions",
       },
       {
         title: "Reports",
