@@ -42,6 +42,7 @@ function SubscriptionManagement() {
 
   // Form states
   const [formData, setFormData] = useState({
+    selectedGym: "",
     memberId: "",
     planName: "",
     price: "",
@@ -66,20 +67,23 @@ function SubscriptionManagement() {
   const fetchSubscriptions = async () => {
     setLoading(true);
     try {
-      const params = {
-        page: currentPage,
-        limit: itemsPerPage,
-      };
-      if (selectedGym !== "all") params.gymId = selectedGym;
-      if (selectedStatus !== "all") params.status = selectedStatus;
-      if (selectedPaymentStatus !== "all") params.paymentStatus = selectedPaymentStatus;
-      if (searchTerm) params.search = searchTerm;
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      if (selectedGym !== "all") params.append("gymId", selectedGym);
+      if (selectedStatus !== "all") params.append("status", selectedStatus);
+      if (selectedPaymentStatus !== "all") params.append("paymentStatus", selectedPaymentStatus);
+      if (searchTerm) params.append("search", searchTerm);
 
-      const response = await api.get("/admin/subscriptions", { params });
-      setSubscriptions(response.data.data || []);
-      setTotalItems(response.data.pagination?.total || 0);
+      const response = await api.get(`/admin/subscriptions?${params.toString()}`);
+      console.log("Subscriptions API response:", response);
+      // API response structure: { success: true, data: [...], pagination: {...} }
+      setSubscriptions(response.data || []);
+      setTotalItems(response.pagination?.total || 0);
     } catch (error) {
       console.error("Error fetching subscriptions:", error);
+      setSubscriptions([]);
     } finally {
       setLoading(false);
     }
@@ -96,31 +100,62 @@ function SubscriptionManagement() {
 
   const fetchGyms = async () => {
     try {
-      const response = await api.get("/gyms");
-      setGyms(response.data.data || []);
+      const params = new URLSearchParams({
+        limit: "1000", // Get all registered gyms
+      });
+      const response = await api.get(`/gyms?${params.toString()}`);
+      console.log("Gyms API response:", response);
+      // API response structure: { success: true, data: [...], pagination: {...} }
+      const gymsList = response.data || [];
+      console.log("Gyms list:", gymsList);
+      setGyms(gymsList);
     } catch (error) {
       console.error("Error fetching gyms:", error);
+      setGyms([]);
     }
   };
 
   const fetchMembers = async (gymId) => {
+    if (!gymId) {
+      setMembers([]);
+      return;
+    }
     try {
-      const response = await api.get(`/members?gym=${gymId}`);
-      setMembers(response.data.data || []);
+      const params = new URLSearchParams({
+        gym: gymId,
+        limit: "1000", // Get all members for the gym
+      });
+      const response = await api.get(`/members?${params.toString()}`);
+      console.log("Members API response:", response);
+      // API response structure: { success: true, data: [...], pagination: {...} }
+      const membersList = response.data || [];
+      console.log("Members list for gym:", membersList);
+      setMembers(membersList);
     } catch (error) {
       console.error("Error fetching members:", error);
+      setMembers([]);
     }
   };
 
   const handleCreateSubscription = async (e) => {
     e.preventDefault();
     try {
+      // Validate required fields
+      if (!formData.memberId) {
+        alert("Please select a member");
+        return;
+      }
+      if (!formData.planName || !formData.price || !formData.startDate) {
+        alert("Please fill in all required fields");
+        return;
+      }
+
       const featuresArray = formData.features
         .split(",")
         .map((f) => f.trim())
         .filter((f) => f);
 
-      await api.post(`/admin/subscriptions/${formData.memberId}/create`, {
+      const response = await api.post(`/admin/subscriptions/${formData.memberId}/create`, {
         planName: formData.planName,
         price: parseFloat(formData.price),
         features: featuresArray,
@@ -130,8 +165,14 @@ function SubscriptionManagement() {
         paymentStatus: formData.paymentStatus,
       });
 
+      console.log("Subscription created successfully:", response);
+
+      // Show success message
+      alert("Subscription created successfully!");
+
       setShowCreateModal(false);
       setFormData({
+        selectedGym: "",
         memberId: "",
         planName: "",
         price: "",
@@ -141,11 +182,13 @@ function SubscriptionManagement() {
         paymentMethod: "manual",
         paymentStatus: "paid",
       });
+      setMembers([]);
       fetchSubscriptions();
       fetchStats();
     } catch (error) {
       console.error("Error creating subscription:", error);
-      alert("Failed to create subscription: " + (error.response?.data?.message || error.message));
+      const errorMessage = error.message || error.response?.data?.message || "Failed to create subscription";
+      alert("Failed to create subscription: " + errorMessage);
     }
   };
 
@@ -259,7 +302,21 @@ function SubscriptionManagement() {
           <p className="text-gray-400 mt-1">Manage member subscriptions manually</p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => {
+            setShowCreateModal(true);
+            setFormData({
+              selectedGym: "",
+              memberId: "",
+              planName: "",
+              price: "",
+              features: "",
+              startDate: "",
+              duration: "30",
+              paymentMethod: "manual",
+              paymentStatus: "paid",
+            });
+            setMembers([]);
+          }}
           className="inline-flex items-center px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
         >
           <FiPlus className="w-5 h-5 mr-2" />
@@ -514,6 +571,32 @@ function SubscriptionManagement() {
             <form onSubmit={handleCreateSubscription} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Select Gym
+                </label>
+                <select
+                  required
+                  value={formData.selectedGym}
+                  onChange={(e) => {
+                    const gymId = e.target.value;
+                    setFormData({ ...formData, selectedGym: gymId, memberId: "" });
+                    fetchMembers(gymId);
+                  }}
+                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-violet-500"
+                >
+                  <option value="">Select a gym...</option>
+                  {gyms && gyms.length > 0 ? (
+                    gyms.map((gym) => (
+                      <option key={gym._id} value={gym._id}>
+                        {gym.gymName}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No approved gyms found</option>
+                  )}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Select Member
                 </label>
                 <select
@@ -521,15 +604,18 @@ function SubscriptionManagement() {
                   value={formData.memberId}
                   onChange={(e) => {
                     setFormData({ ...formData, memberId: e.target.value });
-                    const member = members.find((m) => m._id === e.target.value);
-                    if (member) {
-                      fetchMembers(member.gym);
-                    }
                   }}
-                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-violet-500"
+                  disabled={!formData.selectedGym || members.length === 0}
+                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select a member...</option>
-                  {members.map((member) => (
+                  <option value="">
+                    {!formData.selectedGym
+                      ? "Please select a gym first"
+                      : members.length === 0
+                      ? "No members found in this gym"
+                      : "Select a member..."}
+                  </option>
+                  {members && members.length > 0 && members.map((member) => (
                     <option key={member._id} value={member._id}>
                       {member.firstName} {member.lastName} - {member.email}
                     </option>
@@ -640,7 +726,21 @@ function SubscriptionManagement() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setFormData({
+                      selectedGym: "",
+                      memberId: "",
+                      planName: "",
+                      price: "",
+                      features: "",
+                      startDate: "",
+                      duration: "30",
+                      paymentMethod: "manual",
+                      paymentStatus: "paid",
+                    });
+                    setMembers([]);
+                  }}
                   className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
                 >
                   Cancel

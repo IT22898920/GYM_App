@@ -466,16 +466,29 @@ export const addMember = async (req, res) => {
 // Get all members for a gym
 export const getMembers = async (req, res) => {
   try {
-    const gymOwnerId = req.user.id;
-    const { page = 1, limit = 10, search = '', status = 'all', instructorId } = req.query;
+    const { page = 1, limit = 10, search = '', status = 'all', instructorId, gym: gymId } = req.query;
 
-    // Find the gym
-    const gym = await Gym.findOne({ owner: gymOwnerId, status: 'approved' });
-    if (!gym) {
-      return res.status(404).json({
-        success: false,
-        message: 'No approved gym found for this owner'
-      });
+    let gym;
+    
+    // Admin can specify gymId in query params
+    if (req.user.role === 'admin' && gymId) {
+      gym = await Gym.findById(gymId);
+      if (!gym) {
+        return res.status(404).json({
+          success: false,
+          message: 'Gym not found'
+        });
+      }
+    } else {
+      // For gym owners, find their gym
+      const gymOwnerId = req.user.id;
+      gym = await Gym.findOne({ owner: gymOwnerId, status: 'approved' });
+      if (!gym) {
+        return res.status(404).json({
+          success: false,
+          message: 'No approved gym found for this owner'
+        });
+      }
     }
 
     // Build query

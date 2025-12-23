@@ -82,7 +82,7 @@ function SuspensionManagement() {
           filteredGyms = allGyms.filter((g) => g.status === "suspended" || !g.isActive);
         } else if (selectedStatus === "approved") {
           filteredGyms = allGyms.filter((g) => g.status === "approved" && g.isActive);
-        } else if (selectedStatus === "pending") {
+        } else if (selectedStatus === "pending") {claud
           filteredGyms = allGyms.filter((g) => g.status === "pending");
         }
       }
