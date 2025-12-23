@@ -14,6 +14,8 @@ import {
   FiChevronsRight,
   FiEye,
   FiRefreshCw,
+  FiLock,
+  FiUnlock,
 } from "react-icons/fi";
 
 function SuspensionManagement() {
@@ -501,8 +503,9 @@ function SuspensionManagement() {
                                 setSelectedItem(gym._id);
                                 setShowUnsuspendModal(true);
                               }}
-                              className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded-lg hover:bg-emerald-500/30 hover:border-emerald-500 transition-all text-sm font-medium shadow-sm hover:shadow-emerald-500/20"
                             >
+                              <FiUnlock className="w-4 h-4" />
                               Unsuspend
                             </button>
                           ) : (
@@ -511,8 +514,9 @@ function SuspensionManagement() {
                                 setSelectedItem(gym._id);
                                 setShowSuspendModal(true);
                               }}
-                              className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 hover:border-red-500 transition-all text-sm font-medium shadow-sm hover:shadow-red-500/20"
                             >
+                              <FiLock className="w-4 h-4" />
                               Suspend
                             </button>
                           )}
@@ -565,8 +569,9 @@ function SuspensionManagement() {
                               setSelectedItem(instructor._id);
                               setShowUnsuspendModal(true);
                             }}
-                            className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors text-sm"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded-lg hover:bg-emerald-500/30 hover:border-emerald-500 transition-all text-sm font-medium shadow-sm hover:shadow-emerald-500/20"
                           >
+                            <FiUnlock className="w-4 h-4" />
                             Unsuspend
                           </button>
                         ) : (
@@ -575,8 +580,9 @@ function SuspensionManagement() {
                               setSelectedItem(instructor._id);
                               setShowSuspendModal(true);
                             }}
-                            className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 hover:border-red-500 transition-all text-sm font-medium shadow-sm hover:shadow-red-500/20"
                           >
+                            <FiLock className="w-4 h-4" />
                             Suspend
                           </button>
                         )}
