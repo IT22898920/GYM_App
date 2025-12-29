@@ -231,7 +231,7 @@ export const updateSubscription = async (req, res) => {
       console.error('Error creating subscription history:', historyError);
     }
 
-    // Send notification
+    // Send notification to member
     if (member.user) {
       try {
         await NotificationService.createNotification({
@@ -248,6 +248,27 @@ export const updateSubscription = async (req, res) => {
         });
       } catch (notificationError) {
         console.error('Error sending notification:', notificationError);
+      }
+    }
+
+    // Send notification to gym owner
+    if (member.gym && member.gym.owner) {
+      try {
+        await NotificationService.createNotification({
+          recipient: member.gym.owner,
+          type: 'member_subscription_updated',
+          title: 'Member Subscription Updated',
+          message: `Member ${member.firstName} ${member.lastName}'s subscription has been updated by admin.`,
+          data: {
+            memberId: member._id,
+            memberName: `${member.firstName} ${member.lastName}`,
+            planName: member.membershipPlan.name
+          },
+          link: '/gym-owner/members',
+          priority: 'medium'
+        });
+      } catch (notificationError) {
+        console.error('Error sending gym owner notification:', notificationError);
       }
     }
 
