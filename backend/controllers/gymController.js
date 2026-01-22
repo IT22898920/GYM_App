@@ -785,6 +785,283 @@ export const toggleGymStatus = async (req, res) => {
   }
 };
 
+// Suspend gym with reason (Admin only)
+export const suspendGym = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, unsuspendDate, notes } = req.body;
+
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can suspend gyms'
+      });
+    }
+
+    const gym = await Gym.findById(id).populate('owner', 'firstName lastName email');
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    gym.status = 'suspended';
+    gym.isActive = false;
+    gym.suspensionDetails = {
+      reason: reason || 'No reason provided',
+      suspendedBy: req.user.id,
+      suspendedAt: new Date(),
+      unsuspendDate: unsuspendDate ? new Date(unsuspendDate) : null,
+      notes: notes || ''
+    };
+
+    await gym.save();
+
+    // Create suspension history record
+    try {
+      const SuspensionHistory = (await import('../models/SuspensionHistory.js')).default;
+      await SuspensionHistory.create({
+        entityType: 'gym',
+        entityId: gym._id,
+        entityTypeRef: 'Gym',
+        action: 'suspended',
+        reason: reason || 'No reason provided',
+        suspensionType: 'global',
+        suspendedBy: req.user.id,
+        suspendedAt: new Date(),
+        unsuspendDate: unsuspendDate ? new Date(unsuspendDate) : null,
+        notes: notes || ''
+      });
+    } catch (historyError) {
+      console.error('Error creating suspension history:', historyError);
+    }
+
+    // Send notifications
+    const NotificationService = (await import('../services/notificationService.js')).default;
+    
+    // Notify gym owner
+    if (gym.owner) {
+      try {
+        await NotificationService.createNotification({
+          recipient: gym.owner._id,
+          type: 'gym_suspended',
+          title: 'Gym Suspended ⚠️',
+          message: `Your gym "${gym.gymName}" has been suspended. Reason: ${reason || 'No reason provided'}.`,
+          data: {
+            gymId: gym._id,
+            gymName: gym.gymName,
+            reason: reason
+          },
+          link: '/gym-owner/dashboard',
+          priority: 'high'
+        });
+      } catch (notificationError) {
+        console.error('Error sending gym owner notification:', notificationError);
+      }
+    }
+
+    // Notify gym members
+    const Member = (await import('../models/Member.js')).default;
+    const members = await Member.find({ gym: gym._id, status: 'active' }).populate('user');
+    for (const member of members) {
+      if (member.user) {
+        try {
+          await NotificationService.createNotification({
+            recipient: member.user._id,
+            type: 'gym_suspended_member',
+            title: 'Gym Suspended',
+            message: `The gym "${gym.gymName}" you are a member of has been suspended.`,
+            data: {
+              gymId: gym._id,
+              gymName: gym.gymName
+            },
+            link: '/member/dashboard',
+            priority: 'high'
+          });
+        } catch (notificationError) {
+          console.error('Error sending member notification:', notificationError);
+        }
+      }
+    }
+
+    // Notify gym instructors
+    for (const instructorData of gym.instructors || []) {
+      if (instructorData.instructor) {
+        try {
+          await NotificationService.createNotification({
+            recipient: instructorData.instructor,
+            type: 'gym_suspended_instructor',
+            title: 'Gym Suspended',
+            message: `The gym "${gym.gymName}" you work at has been suspended.`,
+            data: {
+              gymId: gym._id,
+              gymName: gym.gymName
+            },
+            link: '/instructor/dashboard',
+            priority: 'high'
+          });
+        } catch (notificationError) {
+          console.error('Error sending instructor notification:', notificationError);
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Gym suspended successfully',
+      data: gym
+    });
+
+  } catch (error) {
+    console.error('Error suspending gym:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to suspend gym',
+      error: error.message
+    });
+  }
+};
+
+// Unsuspend gym (Admin only)
+export const unsuspendGym = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can unsuspend gyms'
+      });
+    }
+
+    const gym = await Gym.findById(id).populate('owner', 'firstName lastName email');
+    if (!gym) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gym not found'
+      });
+    }
+
+    if (gym.status !== 'suspended') {
+      return res.status(400).json({
+        success: false,
+        message: 'Gym is not currently suspended'
+      });
+    }
+
+    gym.status = 'approved';
+    gym.isActive = true;
+    if (gym.suspensionDetails) {
+      gym.suspensionDetails.notes = notes || gym.suspensionDetails.notes || '';
+    }
+
+    await gym.save();
+
+    // Create suspension history record
+    try {
+      const SuspensionHistory = (await import('../models/SuspensionHistory.js')).default;
+      await SuspensionHistory.create({
+        entityType: 'gym',
+        entityId: gym._id,
+        entityTypeRef: 'Gym',
+        action: 'unsuspended',
+        reason: gym.suspensionDetails?.reason || '',
+        suspensionType: 'global',
+        suspendedBy: req.user.id,
+        suspendedAt: gym.suspensionDetails?.suspendedAt || new Date(),
+        notes: notes || ''
+      });
+    } catch (historyError) {
+      console.error('Error creating suspension history:', historyError);
+    }
+
+    // Send notifications to all relevant parties
+    const NotificationService = (await import('../services/notificationService.js')).default;
+    
+    // Notify gym owner
+    if (gym.owner) {
+      try {
+        await NotificationService.createNotification({
+          recipient: gym.owner._id,
+          type: 'gym_unsuspended',
+          title: 'Gym Unsuspended ✅',
+          message: `Your gym "${gym.gymName}" has been unsuspended and is now active.`,
+          data: {
+            gymId: gym._id,
+            gymName: gym.gymName
+          },
+          link: '/gym-owner/dashboard',
+          priority: 'high'
+        });
+      } catch (notificationError) {
+        console.error('Error sending gym owner notification:', notificationError);
+      }
+    }
+
+    // Notify gym members
+    const Member = (await import('../models/Member.js')).default;
+    const members = await Member.find({ gym: gym._id, status: 'active' }).populate('user');
+    for (const member of members) {
+      if (member.user) {
+        try {
+          await NotificationService.createNotification({
+            recipient: member.user._id,
+            type: 'gym_unsuspended_member',
+            title: 'Gym Unsuspended ✅',
+            message: `The gym "${gym.gymName}" you are a member of has been unsuspended and is now active.`,
+            data: {
+              gymId: gym._id,
+              gymName: gym.gymName
+            },
+            link: '/member/dashboard',
+            priority: 'high'
+          });
+        } catch (notificationError) {
+          console.error('Error sending member notification:', notificationError);
+        }
+      }
+    }
+
+    // Notify gym instructors
+    for (const instructorData of gym.instructors || []) {
+      if (instructorData.instructor) {
+        try {
+          await NotificationService.createNotification({
+            recipient: instructorData.instructor,
+            type: 'gym_unsuspended_instructor',
+            title: 'Gym Unsuspended ✅',
+            message: `The gym "${gym.gymName}" you work at has been unsuspended and is now active.`,
+            data: {
+              gymId: gym._id,
+              gymName: gym.gymName
+            },
+            link: '/instructor/dashboard',
+            priority: 'high'
+          });
+        } catch (notificationError) {
+          console.error('Error sending instructor notification:', notificationError);
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Gym unsuspended successfully',
+      data: gym
+    });
+
+  } catch (error) {
+    console.error('Error unsuspending gym:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unsuspend gym',
+      error: error.message
+    });
+  }
+};
+
 // Add instructor to gym
 export const addInstructorToGym = async (req, res) => {
   try {

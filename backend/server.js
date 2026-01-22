@@ -17,6 +17,7 @@ import memberRoutes from './routes/memberRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import gifRoutes from './routes/gifRoutes.js';
 import classRoutes from './routes/classRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import mobileRoutes from './routes/mobileRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -92,7 +93,9 @@ app.use('/api/members', memberRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/gifs', gifRoutes);
 app.use('/api/classes', classRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/mobile', mobileRoutes);
+
 
 // Health check route
 app.get('/api/health', (req, res) => {

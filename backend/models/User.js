@@ -50,6 +50,34 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  suspensionStatus: {
+    isSuspended: {
+      type: Boolean,
+      default: false
+    },
+    suspendedGyms: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Gym'
+    }],
+    reason: {
+      type: String,
+      trim: true
+    },
+    suspendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    suspendedAt: {
+      type: Date
+    },
+    unsuspendDate: {
+      type: Date
+    },
+    notes: {
+      type: String,
+      trim: true
+    }
+  },
   isVerified: {
     type: Boolean,
     default: false

@@ -90,6 +90,8 @@ import CustomerRegisterGym from "./pages/CustomerRegisterGym";
 import GymRegistrations from "./pages/admin/GymRegistrations";
 import Gif from "./pages/admin/Gif";
 import AdminFacilities from "./pages/admin/Facilities";
+import SubscriptionManagement from "./pages/admin/SubscriptionManagement";
+import SuspensionManagement from "./pages/admin/SuspensionManagement";
 
 
 function App() {
@@ -136,6 +138,8 @@ function AppContent() {
           <Route path="gym-registrations" element={<GymRegistrations />} />
           <Route path="facilities" element={<Gif />} />
           <Route path="gym-workouts" element={<AdminFacilities />} />
+          <Route path="subscriptions" element={<SubscriptionManagement />} />
+          <Route path="suspensions" element={<SuspensionManagement />} />
 
           <Route
             path="instructor-applications"

@@ -34,6 +34,9 @@ router.patch('/update-workout-status', protect, authorize('customer'), updateWor
 router.post('/add-member-note', protect, authorize('customer'), addMemberNote);
 router.delete('/delete-member-note', protect, authorize('customer'), deleteMemberNote);
 
+// Get members - accessible by admin and gymOwner
+router.get('/', protect, authorize('gymOwner', 'admin'), getMembers);
+
 // All routes below require authentication and gym owner authorization
 router.use(protect);
 router.use(authorize('gymOwner'));
@@ -50,7 +53,6 @@ router.get('/search-users', searchExistingUsers);
 // CRUD operations
 router.post('/', addMember);
 router.post('/add-existing', addExistingUserAsMember);
-router.get('/', getMembers);
 router.get('/:memberId', getMember);
 router.put('/:memberId', updateMember);
 router.delete('/:memberId', deleteMember);

@@ -23,6 +23,8 @@ import {
   deleteBankAccount,
   getPendingGyms,
   toggleGymStatus,
+  suspendGym,
+  unsuspendGym,
   searchAvailableInstructors
 } from '../controllers/gymController.js';
 import { protect, authorize, optionalAuth } from '../middleware/auth.js';
@@ -77,5 +79,7 @@ router.get('/:id/statistics', authorize('gymOwner', 'admin'), getGymStatistics);
 router.put('/:id/approve', authorize('admin'), approveGym);
 router.put('/:id/reject', authorize('admin'), rejectGym);
 router.put('/:id/toggle-status', authorize('gymOwner', 'admin'), toggleGymStatus);
+router.put('/:id/suspend', authorize('admin'), suspendGym);
+router.put('/:id/unsuspend', authorize('admin'), unsuspendGym);
 
 export default router;
