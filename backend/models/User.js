@@ -154,6 +154,31 @@ const userSchema = new mongoose.Schema({
       default: Date.now
     }
   },
+  // Mobile device tokens for push notifications
+  deviceTokens: [{
+    token: {
+      type: String,
+      required: true
+    },
+    platform: {
+      type: String,
+      enum: ['ios', 'android', 'web'],
+      required: true
+    },
+    deviceInfo: {
+      model: String,
+      osVersion: String,
+      appVersion: String
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    lastUsed: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   refreshToken: {
     type: String,
     select: false

@@ -1,9 +1,10 @@
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
+import { sendPushNotificationToUser, sendPushNotificationToMultipleDevices } from './fcmService.js';
 
 class NotificationService {
   // Create a single notification
-  static async createNotification({ recipient, sender, type, title, message, data = {}, link = null, priority = 'medium' }) {
+  static async createNotification({ recipient, sender, type, title, message, data = {}, link = null, priority = 'medium', sendPush = true }) {
     try {
       const notification = await Notification.createNotification({
         recipient,
@@ -16,6 +17,24 @@ class NotificationService {
         priority
       });
 
+      // Send push notification to mobile devices
+      if (sendPush) {
+        try {
+          const user = await User.findById(recipient).select('deviceTokens');
+          if (user && user.deviceTokens && user.deviceTokens.length > 0) {
+            await sendPushNotificationToUser(user, title, message, {
+              type,
+              notificationId: notification._id.toString(),
+              link: link || '',
+              ...data
+            });
+          }
+        } catch (pushError) {
+          console.error('Error sending push notification:', pushError.message);
+          // Don't fail the whole operation if push notification fails
+        }
+      }
+
       // Here you could add real-time notification via Socket.io if implemented
       // io.to(recipient.toString()).emit('newNotification', notification);
 
@@ -27,7 +46,7 @@ class NotificationService {
   }
 
   // Create notifications for multiple recipients
-  static async createBulkNotifications({ recipients, sender, type, title, message, data = {}, link = null, priority = 'medium' }) {
+  static async createBulkNotifications({ recipients, sender, type, title, message, data = {}, link = null, priority = 'medium', sendPush = true }) {
     try {
       const notifications = await Promise.all(
         recipients.map(recipient =>
@@ -39,7 +58,8 @@ class NotificationService {
             message,
             data,
             link,
-            priority
+            priority,
+            sendPush // Pass the sendPush parameter
           })
         )
       );
