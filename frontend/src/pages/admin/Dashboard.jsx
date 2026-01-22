@@ -197,7 +197,7 @@ function Dashboard() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
             Dashboard
           </h1>
-          <p className="text-gray-400 mt-1">Welcome back, Admin</p>
+          <p className="text-gray-400 mt-1">Welcome to Admin Dashboard</p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <select
